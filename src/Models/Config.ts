@@ -42,6 +42,8 @@ export interface ChatBehaviorSettings {
   generateAtCursor: boolean;
   /** Whether to automatically infer title after 4 messages have been exchanged */
   autoInferTitle: boolean;
+  /** Whether to disable the plugin's system message */
+  disablePluginSystemMessage: boolean;
 }
 
 /**
@@ -117,6 +119,7 @@ export const DEFAULT_SETTINGS: ChatGPT_MDSettings = {
   stream: true,
   generateAtCursor: false,
   autoInferTitle: false,
+  disablePluginSystemMessage: false,
 
   // Formatting
   dateFormat: DEFAULT_DATE_FORMAT,

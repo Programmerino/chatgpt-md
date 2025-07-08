@@ -135,6 +135,14 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
         type: "toggle",
         group: "Chat Behavior",
       },
+      {
+        id: "disablePluginSystemMessage",
+        name: "Disable Plugin System Message",
+        description:
+          "If enabled, the plugin's system message will not be added to your prompts. This gives you full control over the initial prompt.",
+        type: "toggle",
+        group: "Chat Behavior",
+      },
 
       // Folders
       {

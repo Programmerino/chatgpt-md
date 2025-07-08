@@ -186,19 +186,21 @@ export class AnthropicService extends BaseAiService implements IAiApiService {
     config: AnthropicConfig,
     editor: Editor,
     headingPrefix: string,
-    setAtCursor?: boolean | undefined
+    setAtCursor?: boolean | undefined,
+    settings?: ChatGPT_MDSettings
   ): Promise<{ fullString: string; mode: "streaming"; wasAborted?: boolean }> {
     // Use the default implementation from BaseAiService
-    return this.defaultCallStreamingAPI(apiKey, messages, config, editor, headingPrefix, setAtCursor);
+    return this.defaultCallStreamingAPI(apiKey, messages, config, editor, headingPrefix, setAtCursor, settings);
   }
 
   protected async callNonStreamingAPI(
     apiKey: string | undefined,
     messages: Message[],
-    config: AnthropicConfig
+    config: AnthropicConfig,
+    settings?: ChatGPT_MDSettings
   ): Promise<any> {
     // Use the default implementation from BaseAiService
-    return this.defaultCallNonStreamingAPI(apiKey, messages, config);
+    return this.defaultCallNonStreamingAPI(apiKey, messages, config, settings);
   }
 
   protected showNoTitleInferredNotification(): void {
@@ -212,37 +214,41 @@ export class AnthropicService extends BaseAiService implements IAiApiService {
     apiKey: string | undefined,
     messages: Message[],
     config: Record<string, any>,
-    skipPluginSystemMessage: boolean = false
+    skipPluginSystemMessage: boolean = false,
+    settings?: ChatGPT_MDSettings
   ) {
     // Validate API key
     this.apiAuthService.validateApiKey(apiKey, this.serviceType);
 
     // Add plugin system message to help LLM understand context (unless skipped)
-    const finalMessages = skipPluginSystemMessage ? messages : this.addPluginSystemMessage(messages);
+    const finalMessages = this.addPluginSystemMessage(messages);
 
     // Create payload and headers
     const anthropicConfig = config as AnthropicConfig;
     const payload = this.createPayload(anthropicConfig, finalMessages);
     const headers = this.apiAuthService.createAuthHeaders(apiKey!, this.serviceType);
 
-    // Handle system message combination for Anthropic
-    if (!skipPluginSystemMessage) {
-      const systemParts: string[] = [];
+    const shouldAddPluginSystemMessage = !skipPluginSystemMessage && !settings?.disablePluginSystemMessage;
 
+    // Handle system message combination for Anthropic
+    const systemParts: string[] = [];
+
+    if (shouldAddPluginSystemMessage) {
       // Always add plugin system message first
       systemParts.push(PLUGIN_SYSTEM_MESSAGE);
+    }
 
-      // Add user system commands if they exist
-      if (anthropicConfig.system_commands && anthropicConfig.system_commands.length > 0) {
-        systemParts.push(anthropicConfig.system_commands.join("\n\n"));
-      }
+    // Add user system commands if they exist
+    if (anthropicConfig.system_commands && anthropicConfig.system_commands.length > 0) {
+      systemParts.push(anthropicConfig.system_commands.join("\n\n"));
+    }
 
-      // Combine all system messages
+    // Combine all system messages
+    if (systemParts.length > 0) {
       payload.system = systemParts.join("\n\n");
-      console.log(`[ChatGPT MD] Combined plugin system message with user system commands for Anthropic`);
-    } else if (anthropicConfig.system_commands && anthropicConfig.system_commands.length > 0) {
-      // If plugin system message is skipped (like for title inference), only use user system commands
-      payload.system = anthropicConfig.system_commands.join("\n\n");
+      if (shouldAddPluginSystemMessage) {
+        console.log(`[ChatGPT MD] Combined plugin system message with user system commands for Anthropic`);
+      }
     }
 
     // Add Anthropic-specific header for direct browser access
