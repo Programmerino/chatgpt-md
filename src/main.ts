@@ -1,6 +1,7 @@
 import { Plugin } from "obsidian";
 import { ServiceLocator } from "./core/ServiceLocator";
 import { CommandRegistry } from "./core/CommandRegistry";
+import { CHAT_SIDE_VIEW_TYPE, ChatSideView } from "./Views/ChatSideView";
 
 export default class ChatGPT_MD extends Plugin {
   private serviceLocator: ServiceLocator;
@@ -17,6 +18,9 @@ export default class ChatGPT_MD extends Plugin {
 
     // Add settings tab after migrations have completed
     await settingsService.addSettingTab();
+
+    // Register sidebar view
+    this.registerView(CHAT_SIDE_VIEW_TYPE, (leaf) => new ChatSideView(leaf, this.serviceLocator));
 
     // Initialize command registry with services
     this.commandRegistry = new CommandRegistry(this, this.serviceLocator, settingsService);

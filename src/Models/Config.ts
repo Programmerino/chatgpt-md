@@ -5,10 +5,6 @@ import {
   DEFAULT_HEADING_LEVEL,
   DEFAULT_INFER_TITLE_LANGUAGE,
 } from "../Constants";
-import { DEFAULT_OPENROUTER_CONFIG } from "src/Services/OpenRouterService";
-import { DEFAULT_OLLAMA_CONFIG } from "src/Services/OllamaService";
-import { DEFAULT_LMSTUDIO_CONFIG } from "src/Services/LmStudioService";
-import { DEFAULT_ANTHROPIC_CONFIG } from "src/Services/AnthropicService";
 
 /**
  * API key settings
@@ -16,10 +12,6 @@ import { DEFAULT_ANTHROPIC_CONFIG } from "src/Services/AnthropicService";
 export interface ApiKeySettings {
   /** API Key for OpenAI */
   apiKey: string;
-  /** API Key for OpenRouter */
-  openrouterApiKey: string;
-  /** API Key for Anthropic */
-  anthropicApiKey: string;
 }
 
 /**
@@ -44,8 +36,6 @@ export interface ChatBehaviorSettings {
   autoInferTitle: boolean;
   /** Whether to disable the plugin's system message */
   disablePluginSystemMessage: boolean;
-  /** Command to run after generation is complete (Desktop only) */
-  postGenerationCommand: string;
 }
 
 /**
@@ -76,14 +66,6 @@ export interface TemplateSettings {
 export interface ServiceUrlSettings {
   /** URL for OpenAI API */
   openaiUrl: string;
-  /** URL for OpenRouter API */
-  openrouterUrl: string;
-  /** URL for Ollama API */
-  ollamaUrl: string;
-  /** URL for LM Studio API */
-  lmstudioUrl: string;
-  /** URL for Anthropic API */
-  anthropicUrl: string;
 }
 
 /**
@@ -103,15 +85,9 @@ export interface ChatGPT_MDSettings
 export const DEFAULT_SETTINGS: ChatGPT_MDSettings = {
   // API Keys
   apiKey: "",
-  openrouterApiKey: "",
-  anthropicApiKey: "",
 
   // Service URLs
   openaiUrl: DEFAULT_OPENAI_CONFIG.url,
-  openrouterUrl: DEFAULT_OPENROUTER_CONFIG.url,
-  ollamaUrl: DEFAULT_OLLAMA_CONFIG.url,
-  lmstudioUrl: DEFAULT_LMSTUDIO_CONFIG.url,
-  anthropicUrl: DEFAULT_ANTHROPIC_CONFIG.url,
 
   // Folders
   chatFolder: "ChatGPT_MD/chats",
@@ -122,7 +98,6 @@ export const DEFAULT_SETTINGS: ChatGPT_MDSettings = {
   generateAtCursor: false,
   autoInferTitle: false,
   disablePluginSystemMessage: false,
-  postGenerationCommand: "",
 
   // Formatting
   dateFormat: DEFAULT_DATE_FORMAT,

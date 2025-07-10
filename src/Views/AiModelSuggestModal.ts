@@ -1,15 +1,15 @@
-import { App, Editor, Notice, SuggestModal } from "obsidian";
+import { App, Editor, MarkdownView, Notice, SuggestModal } from "obsidian";
 import { EditorService } from "../Services/EditorService";
 
 export class AiModelSuggestModal extends SuggestModal<string> {
   private modelNames: string[];
-  private editor: Editor;
+  private view: MarkdownView;
   private editorService: EditorService;
 
-  constructor(app: App, editor: Editor, editorService: EditorService, modelNames: string[] = []) {
+  constructor(app: App, view: MarkdownView, editorService: EditorService, modelNames: string[] = []) {
     super(app);
     this.modelNames = modelNames;
-    this.editor = editor;
+    this.view = view;
     this.editorService = editorService;
     this.limit = this.modelNames.length;
     if (this.modelNames.length > 0) {
@@ -34,7 +34,7 @@ export class AiModelSuggestModal extends SuggestModal<string> {
 
     new Notice(`Selected model: ${modelName}`);
     try {
-      await this.editorService.setModel(this.editor, modelName);
+      await this.editorService.setModel(this.view, modelName);
     } catch (error) {
       console.error("[ChatGPT MD] Error setting model in frontmatter:", error);
       new Notice(`Error setting model: ${error.message}`);

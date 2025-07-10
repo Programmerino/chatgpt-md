@@ -61,6 +61,10 @@ export class EditorService {
     this.editorContentService.addHorizontalRule(editor, role, headingLevel);
   }
 
+  addCommentBlock(editor: Editor, commentStart: string, commentEnd: string): void {
+    this.editorContentService.addCommentBlock(editor, commentStart, commentEnd);
+  }
+
   async clearChat(editor: Editor): Promise<void> {
     await this.editorContentService.clearChat(editor);
   }
@@ -93,7 +97,7 @@ export class EditorService {
 
   // FrontmatterService delegations
 
-  async getFrontmatter(view: MarkdownView, settings: ChatGPT_MDSettings, app: App): Promise<any> {
+  async getFrontmatter(view: MarkdownView, settings: ChatGPT_MDSettings): Promise<any> {
     return await this.frontmatterService.getFrontmatter(view, settings);
   }
 
@@ -106,7 +110,10 @@ export class EditorService {
   /**
    * Set the model in the front matter of the active file
    */
-  async setModel(editor: Editor, modelName: string): Promise<void> {
-    await this.frontmatterService.updateFrontmatterField(editor, "model", modelName);
+  async setModel(view: MarkdownView, modelName: string): Promise<void> {
+    if (!view.file) {
+      throw new Error("Cannot set model: No active file.");
+    }
+    await this.frontmatterService.updateFrontmatterField(view.file, "model", modelName);
   }
 }

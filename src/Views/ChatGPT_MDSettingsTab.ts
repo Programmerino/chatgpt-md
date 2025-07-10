@@ -2,10 +2,6 @@ import { App, Plugin, PluginSettingTab, Setting } from "obsidian";
 import { ChatGPT_MDSettings } from "src/Models/Config";
 import { DEFAULT_CHAT_FRONT_MATTER, DEFAULT_DATE_FORMAT, ROLE_IDENTIFIER, ROLE_USER } from "src/Constants";
 import { DEFAULT_OPENAI_CONFIG } from "src/Services/OpenAiService";
-import { DEFAULT_OPENROUTER_CONFIG } from "src/Services/OpenRouterService";
-import { DEFAULT_OLLAMA_CONFIG } from "src/Services/OllamaService";
-import { DEFAULT_LMSTUDIO_CONFIG } from "src/Services/LmStudioService";
-import { DEFAULT_ANTHROPIC_CONFIG } from "src/Services/AnthropicService";
 
 interface SettingDefinition {
   id: keyof ChatGPT_MDSettings;
@@ -34,9 +30,7 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    // Define settings schema
     const settingsSchema: SettingDefinition[] = [
-      // API Keys
       {
         id: "apiKey",
         name: "OpenAI API Key",
@@ -46,24 +40,6 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
         group: "API Keys",
       },
       {
-        id: "openrouterApiKey",
-        name: "OpenRouter.ai API Key",
-        description: "API Key for OpenRouter.ai",
-        type: "text",
-        placeholder: "your openRouter API Key",
-        group: "API Keys",
-      },
-      {
-        id: "anthropicApiKey",
-        name: "Anthropic API Key",
-        description: "API Key for Anthropic (Claude)",
-        type: "text",
-        placeholder: "your Anthropic API Key",
-        group: "API Keys",
-      },
-
-      // Service URLs
-      {
         id: "openaiUrl",
         name: "OpenAI API URL",
         description: `URL for OpenAI API\nDefault URL: ${DEFAULT_OPENAI_CONFIG.url}`,
@@ -72,44 +48,10 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
         group: "Service URLs",
       },
       {
-        id: "openrouterUrl",
-        name: "OpenRouter.ai API URL",
-        description: `URL for OpenRouter.ai API\nDefault URL: ${DEFAULT_OPENROUTER_CONFIG.url}`,
-        type: "text",
-        placeholder: DEFAULT_OPENROUTER_CONFIG.url,
-        group: "Service URLs",
-      },
-      {
-        id: "ollamaUrl",
-        name: "Ollama API URL",
-        description: `URL for Ollama API\nDefault URL: ${DEFAULT_OLLAMA_CONFIG.url}`,
-        type: "text",
-        placeholder: DEFAULT_OLLAMA_CONFIG.url,
-        group: "Service URLs",
-      },
-      {
-        id: "lmstudioUrl",
-        name: "LM Studio API URL",
-        description: `URL for LM Studio API\nDefault URL: ${DEFAULT_LMSTUDIO_CONFIG.url}`,
-        type: "text",
-        placeholder: DEFAULT_LMSTUDIO_CONFIG.url,
-        group: "Service URLs",
-      },
-      {
-        id: "anthropicUrl",
-        name: "Anthropic API URL",
-        description: `URL for Anthropic API\nDefault URL: ${DEFAULT_ANTHROPIC_CONFIG.url}`,
-        type: "text",
-        placeholder: DEFAULT_ANTHROPIC_CONFIG.url,
-        group: "Service URLs",
-      },
-
-      // Chat Behavior
-      {
         id: "defaultChatFrontmatter",
         name: "Default Chat Frontmatter",
         description:
-          "Default frontmatter for new chat files. You can change/use all of the settings exposed by the OpenAI API here: https://platform.openai.com/docs/api-reference/chat/create",
+          "Default frontmatter for new chat files. You can use all of the settings exposed by the OpenAI API here: https://platform.openai.com/docs/api-reference/chat/create",
         type: "textarea",
         placeholder: DEFAULT_CHAT_FRONT_MATTER,
         group: "Chat Behavior",
@@ -117,7 +59,7 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
       {
         id: "stream",
         name: "Stream",
-        description: "Stream responses from OpenAI",
+        description: "Stream responses from the AI",
         type: "toggle",
         group: "Chat Behavior",
       },
@@ -138,21 +80,10 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
       {
         id: "disablePluginSystemMessage",
         name: "Disable Plugin System Message",
-        description:
-          "If enabled, the plugin's system message will not be added to your prompts. This gives you full control over the initial prompt.",
+        description: "If enabled, the plugin's system message will not be added to your prompts.",
         type: "toggle",
         group: "Chat Behavior",
       },
-      {
-        id: "postGenerationCommand",
-        name: "Post-generation Command",
-        description: "Command to execute after the AI finishes generating a response. (Desktop only)",
-        type: "text",
-        placeholder: "e.g., notify-send 'ChatGPT response finished.'",
-        group: "Chat Behavior",
-      },
-
-      // Folders
       {
         id: "chatFolder",
         name: "Chat Folder",
@@ -168,8 +99,6 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
         placeholder: "chat-templates",
         group: "Folders",
       },
-
-      // Formatting
       {
         id: "dateFormat",
         name: "Date Format",
@@ -181,7 +110,7 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
       {
         id: "headingLevel",
         name: "Heading Level",
-        description: `Heading level for messages (example for heading level 2: '## ${ROLE_IDENTIFIER}${ROLE_USER}'). Valid heading levels are 0, 1, 2, 3, 4, 5, 6`,
+        description: `Heading level for messages (example for heading level 2: '## ${ROLE_IDENTIFIER}${ROLE_USER}'). Valid heading levels are from 0 to 6.`,
         type: "text",
         group: "Formatting",
       },
@@ -203,11 +132,8 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
         },
         group: "Formatting",
       },
-
-      // Templates
     ];
 
-    // Group settings by category
     const groupedSettings: Record<string, SettingDefinition[]> = {};
     settingsSchema.forEach((setting) => {
       if (!groupedSettings[setting.group]) {
@@ -216,20 +142,16 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
       groupedSettings[setting.group].push(setting);
     });
 
-    // Create settings UI
     Object.entries(groupedSettings).forEach(([group, settings]) => {
       containerEl.createEl("h3", { text: group });
-
       settings.forEach((setting) => {
         this.createSettingElement(containerEl, setting);
       });
-
       containerEl.createEl("hr");
     });
   }
 
   createSettingElement(container: HTMLElement, schema: SettingDefinition) {
-    // Regular handling for all settings
     const setting = new Setting(container).setName(schema.name).setDesc(schema.description);
 
     if (schema.type === "text") {
@@ -241,11 +163,7 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
             (this.settingsProvider.settings[schema.id] as string) = value;
             await this.settingsProvider.saveSettings();
           });
-
-        // Set width to match textarea
         text.inputEl.style.width = "300px";
-
-        return text;
       });
     } else if (schema.type === "textarea") {
       setting.addTextArea((text) => {
@@ -256,17 +174,11 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
             (this.settingsProvider.settings[schema.id] as string) = value;
             await this.settingsProvider.saveSettings();
           });
-
-        // Set width for all textareas
         text.inputEl.style.width = "300px";
-
-        // Special height for defaultChatFrontmatter
         if (schema.id === "defaultChatFrontmatter") {
           text.inputEl.style.height = "260px";
           text.inputEl.style.minHeight = "260px";
         }
-
-        return text;
       });
     } else if (schema.type === "toggle") {
       setting.addToggle((toggle) =>
@@ -283,11 +195,7 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
           (this.settingsProvider.settings[schema.id] as string) = value;
           await this.settingsProvider.saveSettings();
         });
-
-        // Set width to match textarea
         dropdown.selectEl.style.width = "300px";
-
-        return dropdown;
       });
     }
   }

@@ -42,7 +42,7 @@
           installPhase = ''
             runHook preInstall
             mkdir -p $out
-            install -m 644 main.js manifest.json $out/
+            install -m 644 main.js manifest.json styles.css $out/
             runHook postInstall
           '';
 

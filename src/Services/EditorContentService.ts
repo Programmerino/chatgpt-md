@@ -1,7 +1,7 @@
 import { App, Editor, MarkdownView } from "obsidian";
 import { getHeaderRole, getHeadingPrefix } from "src/Utilities/TextHelpers";
 import { FrontmatterManager } from "src/Services/FrontmatterManager";
-import { HORIZONTAL_LINE_CLASS, NEWLINE, ROLE_ASSISTANT, ROLE_IDENTIFIER, ROLE_USER } from "src/Constants";
+import { HORIZONTAL_LINE_MD, NEWLINE, ROLE_ASSISTANT, ROLE_IDENTIFIER, ROLE_USER } from "src/Constants";
 
 /**
  * Service responsible for editor content manipulation
@@ -18,7 +18,9 @@ export class EditorContentService {
    * Add a horizontal rule with a role header
    */
   addHorizontalRule(editor: Editor, role: string, headingLevel: number): void {
-    const formattedContent = `${NEWLINE}<hr class="${HORIZONTAL_LINE_CLASS}">${NEWLINE}${getHeadingPrefix(headingLevel)}${ROLE_IDENTIFIER}${role}${NEWLINE}`;
+    const formattedContent = `${NEWLINE}${HORIZONTAL_LINE_MD}${NEWLINE}${getHeadingPrefix(
+      headingLevel
+    )}${ROLE_IDENTIFIER}${role}${NEWLINE}`;
 
     const currentPosition = editor.getCursor();
 

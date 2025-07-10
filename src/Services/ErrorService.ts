@@ -1,5 +1,5 @@
 import { NotificationService } from "./NotificationService";
-import { AI_SERVICE_OLLAMA, ERROR_NO_CONNECTION } from "src/Constants";
+import { ERROR_NO_CONNECTION } from "src/Constants";
 
 /**
  * Error types that can be handled by the ErrorService
@@ -104,50 +104,8 @@ Model- ${model}, URL- ${url}`;
     const parts = [];
     if (model) parts.push(`Model: ${model}`);
     if (url) {
-      // Ensure URL is displayed correctly without replacing special characters
       parts.push(`URL: ${url}`);
     }
     return parts.length > 0 ? parts.join(", ") : "";
-  }
-
-  /**
-   * Handle URL configuration errors
-   */
-  handleUrlError(url: string, defaultUrl: string, serviceName: string): string {
-    const errorMessage = `[ChatGPT MD] Error calling specified URL: ${url}`;
-
-    this.notificationService.showNotification(errorMessage);
-    console.error(errorMessage, { url, defaultUrl, serviceName });
-
-    // Format the URL properly for display in the chat message
-    return `I am sorry, I could not answer your request because of an error, here is what went wrong-
-
-Error connecting to the custom URL.
-
-Model- ${serviceName === AI_SERVICE_OLLAMA ? "llama2" : "unknown"}, URL- ${url}`;
-  }
-
-  /**
-   * Handle model configuration errors
-   */
-  handleModelError(model: string, serviceName: string): string {
-    const errorMessage = `[ChatGPT MD] Error calling model: ${model}`;
-
-    this.notificationService.showNotification(errorMessage);
-    console.error(errorMessage, { model, serviceName });
-
-    return `I am sorry, there was an error with the model: ${model}. Please check your settings or try a different model.`;
-  }
-
-  /**
-   * Handle validation errors
-   */
-  handleValidationError(message: string, context?: Record<string, any>): never {
-    const errorMessage = `[ChatGPT MD] Validation Error: ${message}`;
-
-    this.notificationService.showNotification(errorMessage);
-    console.error(errorMessage, context);
-
-    throw new Error(errorMessage);
   }
 }

@@ -13,18 +13,10 @@ import { ApiAuthService } from "src/Services/ApiAuthService";
 import { ApiResponseParser } from "src/Services/ApiResponseParser";
 import { IAiApiService } from "src/Services/AiService";
 import { OpenAiService } from "src/Services/OpenAiService";
-import { OllamaService } from "src/Services/OllamaService";
-import { OpenRouterService } from "src/Services/OpenRouterService";
-import { LmStudioService } from "src/Services/LmStudioService";
-import { AnthropicService } from "src/Services/AnthropicService";
-import {
-  AI_SERVICE_ANTHROPIC,
-  AI_SERVICE_LMSTUDIO,
-  AI_SERVICE_OLLAMA,
-  AI_SERVICE_OPENAI,
-  AI_SERVICE_OPENROUTER,
-} from "src/Constants";
+import { AI_SERVICE_OPENAI } from "src/Constants";
 import { SettingsService } from "src/Services/SettingsService";
+import { ChatService } from "src/Services/ChatService";
+import { CommandRegistry } from "./CommandRegistry";
 
 /**
  * ServiceLocator is responsible for creating and providing access to services
@@ -47,10 +39,16 @@ export class ServiceLocator {
   private apiAuthService: ApiAuthService;
   private apiResponseParser: ApiResponseParser;
   private settingsService: SettingsService;
+  private chatService: ChatService;
+
+  // These are not services in the same way, but are needed by services
+  private statusBarItem: HTMLElement;
+  private commandRegistry: CommandRegistry;
 
   constructor(app: App, plugin: Plugin) {
     this.app = app;
     this.plugin = plugin;
+    this.statusBarItem = plugin.addStatusBarItem();
     this.initializeServices();
   }
 
@@ -87,6 +85,13 @@ export class ServiceLocator {
 
     // Initialize settings service
     this.settingsService = new SettingsService(this.plugin, this.notificationService, this.errorService);
+
+    // Initialize chat service
+    this.chatService = new ChatService(this, this.settingsService);
+  }
+
+  setCommandRegistry(registry: CommandRegistry) {
+    this.commandRegistry = registry;
   }
 
   /**
@@ -95,51 +100,19 @@ export class ServiceLocator {
   getAiApiService(serviceType: string): IAiApiService {
     switch (serviceType) {
       case AI_SERVICE_OPENAI:
-        return new OpenAiService(
-          this.errorService,
-          this.notificationService,
-          this.apiService,
-          this.apiAuthService,
-          this.apiResponseParser
-        );
-      case AI_SERVICE_OLLAMA:
-        return new OllamaService(
-          this.errorService,
-          this.notificationService,
-          this.apiService,
-          this.apiAuthService,
-          this.apiResponseParser
-        );
-      case AI_SERVICE_OPENROUTER:
-        return new OpenRouterService(
-          this.errorService,
-          this.notificationService,
-          this.apiService,
-          this.apiAuthService,
-          this.apiResponseParser
-        );
-      case AI_SERVICE_LMSTUDIO:
-        return new LmStudioService(
-          this.errorService,
-          this.notificationService,
-          this.apiService,
-          this.apiAuthService,
-          this.apiResponseParser
-        );
-      case AI_SERVICE_ANTHROPIC:
-        return new AnthropicService(
-          this.errorService,
-          this.notificationService,
-          this.apiService,
-          this.apiAuthService,
-          this.apiResponseParser
-        );
+        return new OpenAiService(this.errorService, this.notificationService);
       default:
-        throw new Error(`Unknown AI service type: ${serviceType}`);
+        // Default to OpenAI for backward compatibility and as a safe fallback
+        console.warn(`Unknown AI service type: "${serviceType}". Defaulting to OpenAI.`);
+        return new OpenAiService(this.errorService, this.notificationService);
     }
   }
 
   // Getters for all services
+  getApp(): App {
+    return this.app;
+  }
+
   getFileService(): FileService {
     return this.fileService;
   }
@@ -188,10 +161,22 @@ export class ServiceLocator {
     return this.apiResponseParser;
   }
 
+  getChatService(): ChatService {
+    return this.chatService;
+  }
+
+  getCommandRegistry(): CommandRegistry {
+    return this.commandRegistry;
+  }
+
   /**
    * Get the settings service
    */
   getSettingsService(): SettingsService {
     return this.settingsService;
+  }
+
+  getStatusBarItem(): HTMLElement {
+    return this.statusBarItem;
   }
 }
