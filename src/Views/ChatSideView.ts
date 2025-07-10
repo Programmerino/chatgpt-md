@@ -27,6 +27,7 @@ export class ChatSideView extends ItemView {
   private currentAssistantMessageContent = "";
   private currentChatFile: TFile | null = null;
   private isAwaitingResponse = false;
+  private currentMessagesCache: string = "[]";
 
   constructor(leaf: WorkspaceLeaf, serviceLocator: ServiceLocator) {
     super(leaf);
@@ -42,6 +43,32 @@ export class ChatSideView extends ItemView {
   getDisplayText(): string {
     return "ChatGPT MD Chat";
   }
+
+  // This is the primary handler for tracking which file the sidebar should be displaying.
+  private updateView = (): void => {
+    // This is the key fix: prevent re-rendering from file changes
+    // while we are streaming a response and using an optimistic UI.
+    if (this.isAwaitingResponse) {
+      return;
+    }
+
+    // getMostRecentLeaf is the key to stability. It finds the last active leaf
+    // in the main editor area, ignoring focus shifts to sidebars or other UI elements.
+    const mostRecentMarkdownLeaf = this.app.workspace.getMostRecentLeaf(this.app.workspace.rootSplit);
+
+    const newFile = mostRecentMarkdownLeaf?.view instanceof MarkdownView ? mostRecentMarkdownLeaf.view.file : null;
+
+    if (this.currentChatFile?.path !== newFile?.path) {
+      this.currentChatFile = newFile;
+      this.currentMessagesCache = "[]"; // Force re-render for a new file.
+    }
+
+    // Always call renderConversation, as the content of the current file might have changed.
+    this.renderConversation();
+  };
+
+  // A single debounced updater to prevent race conditions and event storms.
+  private scheduleUpdate = debounce(this.updateView, 100, true);
 
   async onOpen() {
     const container = this.containerEl.children[1];
@@ -70,38 +97,21 @@ export class ChatSideView extends ItemView {
       }
     });
 
+    // All relevant events will trigger the same debounced update function.
+    this.registerEvent(this.app.workspace.on("active-leaf-change", this.scheduleUpdate));
+    this.registerEvent(this.app.workspace.on("editor-change", this.scheduleUpdate));
+
     this.registerEvent(
-      this.app.workspace.on("active-leaf-change", (leaf) => {
-        if (leaf?.view instanceof MarkdownView && leaf.view.file) {
-          if (this.currentChatFile?.path !== leaf.view.file.path) {
-            this.currentChatFile = leaf.view.file;
-            this.renderConversation();
-          }
+      this.app.vault.on("rename", (file, oldPath) => {
+        if (this.currentChatFile?.path === oldPath) {
+          // No need to call updateView directly, just schedule it
+          this.scheduleUpdate();
         }
       })
     );
-    this.registerEvent(
-      this.app.workspace.on(
-        "editor-change",
-        debounce(
-          (_editor: Editor, view: MarkdownView) => {
-            // If we are waiting for a response, the sidebar will handle its own updates.
-            // Do not re-render from the file, as it will overwrite the optimistic UI.
-            if (this.isAwaitingResponse) {
-              return;
-            }
-            // Re-render if the change happened in the file this view is tracking
-            if (view.file && this.currentChatFile && view.file.path === this.currentChatFile.path) {
-              this.renderConversation();
-            }
-          },
-          300,
-          true
-        )
-      )
-    );
 
-    this.renderConversation();
+    // Initial load
+    this.scheduleUpdate();
   }
 
   async onClose() {
@@ -109,44 +119,49 @@ export class ChatSideView extends ItemView {
   }
 
   async renderConversation() {
-    if (this.isRendering) return;
+    if (this.isRendering && !this.isAwaitingResponse) return;
     this.isRendering = true;
 
     try {
-      const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-      if (activeView && activeView.file) {
-        this.currentChatFile = activeView.file;
-      }
-
-      this.messageContainer.empty();
-
       if (!this.currentChatFile) {
+        this.messageContainer.empty();
         this.messageContainer.createEl("p", {
           text: "Open a chat note to see the conversation here.",
           cls: "chat-view-placeholder",
         });
         this.textInput.disabled = true;
         this.textInput.placeholder = "Open a chat note to start talking...";
+        this.currentMessagesCache = "[]";
         return;
       }
 
       this.textInput.disabled = false;
       this.textInput.placeholder = "Type your message...";
+
       let fileContent: string;
-
-      const chatLeaf = this.app.workspace
-        .getLeavesOfType("markdown")
-        .find((l) => l.view instanceof MarkdownView && l.view.file?.path === this.currentChatFile?.path);
-
-      if (chatLeaf && chatLeaf.view instanceof MarkdownView) {
-        fileContent = chatLeaf.view.editor.getValue();
+      const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+      // If the current chat file is open in the active editor, use its content directly.
+      // This is the most reliable way to get the latest content during edits.
+      if (activeView && activeView.file?.path === this.currentChatFile.path) {
+        fileContent = activeView.editor.getValue();
       } else {
+        // Otherwise, read from the vault (for background updates).
         fileContent = await this.app.vault.read(this.currentChatFile);
       }
 
       const editorService = this.serviceLocator.getEditorService();
       const settings = this.serviceLocator.getSettingsService().getSettings();
       const { messagesWithRole } = await editorService.getMessagesFromFileContent(fileContent, settings);
+
+      const newMessagesCache = JSON.stringify(messagesWithRole);
+
+      if (newMessagesCache === this.currentMessagesCache) {
+        // No change in messages, so don't re-render.
+        return;
+      }
+
+      this.currentMessagesCache = newMessagesCache;
+      this.messageContainer.empty();
 
       for (const message of messagesWithRole) {
         if (message.content.trim() === "") continue;
@@ -228,6 +243,7 @@ export class ChatSideView extends ItemView {
     this.sendButton.disabled = true;
     this.textInput.value = "";
 
+    // Optimistic UI update
     this.addMessageToView({ role: "user", content: message });
     this.startNewAssistantMessage();
 
@@ -244,10 +260,8 @@ export class ChatSideView extends ItemView {
       this.isAwaitingResponse = false;
       this.sendButton.disabled = false;
       this.textInput.focus();
-
-      // The final state sync. This ensures that even if something went wrong with the
-      // optimistic updates, the view will reflect the ground truth from the file.
-      await this.renderConversation();
+      // Manually trigger a final update to sync the view with the file's ground truth.
+      this.scheduleUpdate();
     }
   }
 

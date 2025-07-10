@@ -75,7 +75,7 @@ if (prod) {
   // Optional: Log bundle analysis info in production
   if (result.metafile) {
     console.log("📦 Bundle analysis:");
-    console.log(`📏 Output size: ${(result.metafile.outputs["main.js"]?.bytes || 0 / 1024).toFixed(2)} KB`);
+    console.log(`📏 Output size: ${((result.metafile.outputs["main.js"]?.bytes || 0) / 1024).toFixed(2)} KB`);
 
     // Show largest dependencies
     const inputs = Object.entries(result.metafile.inputs)

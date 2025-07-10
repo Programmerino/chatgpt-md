@@ -1,7 +1,7 @@
 import { Editor, MarkdownView, Notice, Platform, TFile } from "obsidian";
 import { ServiceLocator } from "../core/ServiceLocator";
 import { SettingsService } from "./SettingsService";
-import { getHeadingPrefix, getHeaderRole } from "../Utilities/TextHelpers";
+import { getHeadingPrefix } from "../Utilities/TextHelpers";
 import { ROLE_ASSISTANT, ROLE_USER } from "src/Constants";
 import { ApiAuthService } from "./ApiAuthService";
 import { MessageService } from "./MessageService";
@@ -77,7 +77,9 @@ export class ChatService {
       }
 
       if (response && !response.wasAborted) {
-        await this.serviceLocator.getCommandRegistry().handleAutoTitleInference(view, frontmatter, messages);
+        const updatedContent = await this.serviceLocator.getApp().vault.read(view.file);
+        const { messages: updatedMessages } = await editorService.getMessagesFromFileContent(updatedContent, settings);
+        await this.serviceLocator.getCommandRegistry().handleAutoTitleInference(view, frontmatter, updatedMessages);
       }
     } catch (err) {
       if (err.name !== "AbortError") {
@@ -91,27 +93,16 @@ export class ChatService {
   }
 
   public async sendMessageFromSidebar(message: string, file: TFile, callbacks: StreamCallbacks) {
-    const workspace = this.serviceLocator.getApp().workspace;
-    const leaf = workspace.getLeavesOfType("markdown").find((l) => {
-      return l.view instanceof MarkdownView && l.view.file === file;
-    });
-
-    if (!leaf || !(leaf.view instanceof MarkdownView)) {
-      new Notice("The chat note for this conversation is not open in any tab.");
-      callbacks.onDone(""); // Stop loading indicator in sidebar
-      return;
-    }
-
-    const view = leaf.view;
-    const editor = view.editor;
-
     const editorService = this.serviceLocator.getEditorService();
     const settings = this.settingsService.getSettings();
+    const vault = this.serviceLocator.getApp().vault;
+    const headingPrefix = getHeadingPrefix(settings.headingLevel);
 
-    // 1. Append user message to the editor note.
-    editorService.appendUserMessage(editor, message, settings);
+    // 1. Append user message directly to the file
+    const userHeader = this.messageService.getHeaderRole(headingPrefix, ROLE_USER);
+    await vault.append(file, `${userHeader}${message}`);
 
-    // 2. Process the chat.
+    // 2. Process the chat
     if (this.streaming) {
       new Notice("A chat is already in progress.");
       return;
@@ -121,9 +112,10 @@ export class ChatService {
     const statusBarItemEl = this.serviceLocator.getStatusBarItem();
 
     try {
-      const frontmatter = await editorService.getFrontmatter(view.file, settings);
+      const frontmatter = await editorService.getFrontmatter(file, settings);
       const aiService = this.serviceLocator.getAiApiService(frontmatter.aiService);
-      const { messagesWithRole, messages } = await editorService.getMessagesFromEditor(editor, settings);
+      const fileContent = await vault.read(file);
+      const { messagesWithRole } = await editorService.getMessagesFromFileContent(fileContent, settings);
 
       if (Platform.isMobile) {
         new Notice(`[ChatGPT MD] Calling ${frontmatter.model}`);
@@ -137,7 +129,7 @@ export class ChatService {
       const response = await aiService.callAIAPI(
         messagesWithRole,
         frontmatter,
-        getHeadingPrefix(settings.headingLevel),
+        headingPrefix,
         undefined, // No editor for direct streaming
         false,
         apiKeyToUse,
@@ -147,18 +139,22 @@ export class ChatService {
 
       // Append the full response to the editor now that streaming is complete.
       if (response && !response.wasAborted) {
-        const assistantHeader = this.messageService.getHeaderRole(
-          getHeadingPrefix(settings.headingLevel),
-          ROLE_ASSISTANT,
-          frontmatter.model
-        );
-        const userHeader = this.messageService.getHeaderRole(getHeadingPrefix(settings.headingLevel), ROLE_USER);
-        const fullResponseText = assistantHeader + response.fullString + userHeader;
+        const assistantHeader = this.messageService.getHeaderRole(headingPrefix, ROLE_ASSISTANT, frontmatter.model);
 
-        editorService.moveCursorToEnd(editor);
-        editor.replaceRange(fullResponseText, editor.getCursor());
+        const fullResponseText = `${assistantHeader}${response.fullString}`;
+        await vault.append(file, fullResponseText);
 
-        await this.serviceLocator.getCommandRegistry().handleAutoTitleInference(view, frontmatter, messages);
+        const activeView = this.serviceLocator.getApp().workspace.getActiveViewOfType(MarkdownView);
+        if (activeView && activeView.file?.path === file.path) {
+          const updatedContent = await vault.read(file);
+          const { messages: updatedMessages } = await editorService.getMessagesFromFileContent(
+            updatedContent,
+            settings
+          );
+          await this.serviceLocator
+            .getCommandRegistry()
+            .handleAutoTitleInference(activeView, frontmatter, updatedMessages);
+        }
       }
     } catch (err) {
       if (err.name !== "AbortError") {
