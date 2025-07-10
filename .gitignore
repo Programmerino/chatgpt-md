@@ -27,7 +27,6 @@ main.js
 !rollup.config.js
 !.eslintrc.js
 dist/
-llm_context
 
 # Nix build artifacts
 result
