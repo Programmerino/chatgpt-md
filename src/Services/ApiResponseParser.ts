@@ -1,7 +1,7 @@
 import { ROLE_ASSISTANT, AI_SERVICE_OPENAI } from "src/Constants";
-import { Editor } from "obsidian";
+import { Editor, EditorPosition } from "obsidian";
 import { NotificationService } from "./NotificationService";
-import { getHeaderRole, unfinishedCodeBlock } from "src/Utilities/TextHelpers";
+import { getHeaderRole, unfinishedCodeBlock, calculateEndPosition } from "src/Utilities/TextHelpers";
 import { ApiService } from "./ApiService";
 
 interface StreamCallbacks {
@@ -17,26 +17,8 @@ export class ApiResponseParser {
     this.notificationService = notificationService || new NotificationService();
   }
 
-  insertAssistantHeader(
-    editor: Editor,
-    headingPrefix: string,
-    model: string
-  ): {
-    initialCursor: { line: number; ch: number };
-    newCursor: { line: number; ch: number };
-  } {
-    const newLine = getHeaderRole(headingPrefix, ROLE_ASSISTANT, model);
-
-    const initialCursor = editor.getCursor();
-    editor.replaceRange(newLine, initialCursor);
-
-    const newCursor = {
-      line: initialCursor.line,
-      ch: initialCursor.ch + newLine.length,
-    };
-    editor.setCursor(newCursor);
-
-    return { initialCursor, newCursor };
+  getAssistantHeader(headingPrefix: string, model: string): string {
+    return getHeaderRole(headingPrefix, ROLE_ASSISTANT, model);
   }
 
   parseNonStreamingResponse(data: any, serviceType: string): string {
@@ -71,13 +53,8 @@ export class ApiResponseParser {
     response: Response,
     serviceType: string,
     editor: Editor | undefined,
-    cursorPositions:
-      | {
-          initialCursor: { line: number; ch: number };
-          newCursor: { line: number; ch: number };
-        }
-      | undefined,
-    setAtCursor?: boolean,
+    contentStartCursor: EditorPosition | undefined,
+    headerStartCursor: EditorPosition | undefined,
     apiService?: ApiService,
     callbacks?: StreamCallbacks
   ): Promise<{ text: string; wasAborted: boolean }> {
@@ -86,9 +63,7 @@ export class ApiResponseParser {
     let text = "";
     let wasAborted = false;
 
-    if (editor && !setAtCursor && cursorPositions) {
-      editor.setCursor(cursorPositions.newCursor);
-    }
+    let currentInsertPosition = contentStartCursor;
 
     try {
       while (true) {
@@ -107,12 +82,9 @@ export class ApiResponseParser {
           const contentChunk = this.processStreamLine(line);
           if (contentChunk) {
             text += contentChunk;
-            if (editor) {
-              if (setAtCursor) {
-                editor.replaceSelection(contentChunk);
-              } else {
-                editor.replaceRange(contentChunk, editor.getCursor());
-              }
+            if (editor && currentInsertPosition) {
+              editor.replaceRange(contentChunk, currentInsertPosition);
+              currentInsertPosition = calculateEndPosition(currentInsertPosition, contentChunk);
             }
             callbacks?.onChunk(contentChunk);
           }
@@ -124,8 +96,8 @@ export class ApiResponseParser {
 
     if (wasAborted) {
       apiService?.resetAbortedFlag();
-      if (editor && cursorPositions) {
-        editor.replaceRange("", cursorPositions.initialCursor, editor.getCursor());
+      if (editor && headerStartCursor) {
+        editor.replaceRange("", headerStartCursor, currentInsertPosition);
       }
       callbacks?.onDone("");
       return { text: "", wasAborted: true };
@@ -134,8 +106,9 @@ export class ApiResponseParser {
     if (unfinishedCodeBlock(text)) {
       const finalChunk = "\n```";
       text += finalChunk;
-      if (editor) {
-        editor.replaceRange(finalChunk, editor.getCursor());
+      if (editor && currentInsertPosition) {
+        editor.replaceRange(finalChunk, currentInsertPosition);
+        currentInsertPosition = calculateEndPosition(currentInsertPosition, finalChunk);
       }
       callbacks?.onChunk(finalChunk);
     }
@@ -146,8 +119,9 @@ export class ApiResponseParser {
         .join("\n");
       const citationsText = `\n\n**Sources:**\n${citations}`;
       text += citationsText;
-      if (editor) {
-        editor.replaceRange(citationsText, editor.getCursor());
+      if (editor && currentInsertPosition) {
+        editor.replaceRange(citationsText, currentInsertPosition);
+        currentInsertPosition = calculateEndPosition(currentInsertPosition, citationsText);
       }
       callbacks?.onChunk(citationsText);
       this.collectedCitations.clear();

@@ -313,36 +313,33 @@ export class MessageService {
    */
   private processStreamingResponse(editor: Editor, settings: ChatGPT_MDSettings): void {
     const headingPrefix = getHeadingPrefix(settings.headingLevel);
-    const newLine = this.getHeaderRole(headingPrefix, ROLE_USER);
-    editor.replaceRange(newLine, editor.getCursor());
+    const userHeader = this.getHeaderRole(headingPrefix, ROLE_USER);
 
-    // move cursor to end of completion
-    const cursor = editor.getCursor();
-    const newCursor = {
-      line: cursor.line,
-      ch: cursor.ch + newLine.length,
-    };
-    editor.setCursor(newCursor);
+    // Get the very end of the document to ensure insertion at the correct place
+    const lastLineIndex = editor.lastLine();
+    const endOfDocCursor = { line: lastLineIndex, ch: editor.getLine(lastLineIndex).length };
+
+    // Insert the new user prompt at the end of the document, regardless of current cursor
+    editor.replaceRange(userHeader, endOfDocCursor);
   }
 
   /**
    * Process a standard (non-streaming) response
    */
   private processStandardResponse(editor: Editor, response: any, settings: ChatGPT_MDSettings): void {
-    // Extract response text and model name
     const responseStr = typeof response === "object" ? response.fullString || response : response;
     const model = typeof response === "object" ? response.model : undefined;
-
-    // Format response text (add closing code block if needed)
     const formattedResponse = this.unfinishedCodeBlock(responseStr) ? responseStr + "\n```" : responseStr;
-
-    // Create headers with model name if available
     const headingPrefix = getHeadingPrefix(settings.headingLevel);
     const assistantHeader = this.getHeaderRole(headingPrefix, ROLE_ASSISTANT, model);
     const userHeader = this.getHeaderRole(headingPrefix, ROLE_USER);
 
-    // Insert the response
-    editor.replaceRange(`${assistantHeader}${formattedResponse}${userHeader}`, editor.getCursor());
+    // Get the very end of the document to ensure insertion at the correct place
+    const lastLineIndex = editor.lastLine();
+    const endOfDocCursor = { line: lastLineIndex, ch: editor.getLine(lastLineIndex).length };
+
+    // Insert the response and the next user prompt at the end of the document
+    editor.replaceRange(`${assistantHeader}${formattedResponse}${userHeader}`, endOfDocCursor);
   }
 
   appendUserMessage(editor: Editor, message: string, settings: ChatGPT_MDSettings): void {

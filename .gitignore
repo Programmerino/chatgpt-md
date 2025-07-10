@@ -23,9 +23,6 @@ data.json
 
 # Build output
 main.js
-!esbuild.config.js
-!rollup.config.js
-!.eslintrc.js
 dist/
 
 # Nix build artifacts

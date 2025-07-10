@@ -1,4 +1,4 @@
-import { parseYaml } from "obsidian";
+import { EditorPosition, parseYaml } from "obsidian";
 import {
   HORIZONTAL_LINE_MD,
   MAX_HEADING_LEVEL,
@@ -94,7 +94,9 @@ export const getHeadingPrefix = (headingLevel: number) => {
 };
 
 export const getHeaderRole = (headingPrefix: string, role: string, model?: string) =>
-  `${NEWLINE}${HORIZONTAL_LINE_MD}${NEWLINE}${headingPrefix}${ROLE_IDENTIFIER}${role}${model ? `<span style="font-size: small;"> (${model})</span>` : ``}${NEWLINE}`;
+  `${NEWLINE}${HORIZONTAL_LINE_MD}${NEWLINE}${headingPrefix}${ROLE_IDENTIFIER}${role}${
+    model ? `<span style="font-size: small;"> (${model})</span>` : ``
+  }${NEWLINE}`;
 
 export const parseSettingsFrontmatter = (yamlString: string): Record<string, any> => {
   if (!yamlString) {
@@ -157,4 +159,19 @@ export const removeYAMLFrontMatter = (note: string | undefined): string | undefi
     .slice(endIndex + 1)
     .join("\n")
     .trim();
+};
+
+export const calculateEndPosition = (start: EditorPosition, text: string): EditorPosition => {
+  const lines = text.split("\n");
+  const lineCount = lines.length;
+
+  if (lineCount === 1) {
+    return { line: start.line, ch: start.ch + text.length };
+  } else {
+    const lastLineLength = lines[lineCount - 1].length;
+    return {
+      line: start.line + lineCount - 1,
+      ch: lastLineLength,
+    };
+  }
 };

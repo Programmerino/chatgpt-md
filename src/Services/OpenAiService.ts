@@ -33,7 +33,6 @@ export const fetchAvailableOpenAiModels = async (url: string, apiKey: string) =>
     return models.data
       .filter(
         (model: OpenAiModel) =>
-          model.id.includes("gpt") &&
           !model.id.includes("vision") &&
           !model.id.includes("dalle") &&
           !model.id.includes("audio") &&

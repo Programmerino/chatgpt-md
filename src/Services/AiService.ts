@@ -1,4 +1,4 @@
-import { Editor, MarkdownView, Platform } from "obsidian";
+import { Editor, MarkdownView, Platform, EditorPosition } from "obsidian";
 import { Message } from "src/Models/Message";
 import { ApiService } from "./ApiService";
 import { ApiAuthService, isValidApiKey } from "./ApiAuthService";
@@ -288,9 +288,21 @@ export abstract class BaseAiService implements IAiApiService {
     try {
       const { payload, headers } = this.prepareApiCall(apiKey, messages, config, false, settings);
 
-      let cursorPositions;
+      let headerStartCursor: EditorPosition | undefined;
+      let contentStartCursor: EditorPosition | undefined;
+
       if (editor && !callbacks) {
-        cursorPositions = this.apiResponseParser.insertAssistantHeader(editor, headingPrefix, payload.model);
+        if (!setAtCursor) {
+          const lastLine = editor.lastLine();
+          editor.setCursor({
+            line: lastLine,
+            ch: editor.getLine(lastLine).length,
+          });
+        }
+        headerStartCursor = editor.getCursor();
+        const assistantHeader = this.apiResponseParser.getAssistantHeader(headingPrefix, payload.model);
+        editor.replaceSelection(assistantHeader);
+        contentStartCursor = editor.getCursor();
       }
 
       const response = await this.apiService.makeStreamingRequest(
@@ -304,8 +316,8 @@ export abstract class BaseAiService implements IAiApiService {
         response,
         this.serviceType,
         editor,
-        cursorPositions,
-        setAtCursor,
+        contentStartCursor,
+        headerStartCursor,
         this.apiService,
         callbacks
       );
