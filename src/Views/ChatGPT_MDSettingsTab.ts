@@ -143,6 +143,14 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
         type: "toggle",
         group: "Chat Behavior",
       },
+      {
+        id: "postGenerationCommand",
+        name: "Post-generation Command",
+        description: "Command to execute after the AI finishes generating a response. (Desktop only)",
+        type: "text",
+        placeholder: "e.g., notify-send 'ChatGPT response finished.'",
+        group: "Chat Behavior",
+      },
 
       // Folders
       {

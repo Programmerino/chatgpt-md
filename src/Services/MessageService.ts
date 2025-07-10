@@ -12,7 +12,7 @@ import {
   ROLE_USER,
   WIKI_LINKS_REGEX,
 } from "src/Constants";
-import { getHeadingPrefix } from "../Utilities/TextHelpers";
+import { getHeadingPrefix, escapeRegExp } from "../Utilities/TextHelpers";
 
 /**
  * Service responsible for all message-related operations
@@ -201,7 +201,7 @@ export class MessageService {
               if (processedContent) {
                 // Replace the wikilink placeholder with the actual content.
                 updatedContent = updatedContent.replace(
-                  new RegExp(this.escapeRegExp(link.link), "g"),
+                  new RegExp(escapeRegExp(link.link), "g"),
                   `${NEWLINE}${link.title}${NEWLINE}${processedContent}${NEWLINE}`
                 );
               }
@@ -330,12 +330,5 @@ export class MessageService {
 
     // Insert the response
     editor.replaceRange(`${assistantHeader}${formattedResponse}${userHeader}`, editor.getCursor());
-  }
-
-  /**
-   * Escape special characters in a string for use in a regular expression
-   */
-  private escapeRegExp(string: string): string {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 }

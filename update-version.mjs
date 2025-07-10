@@ -21,7 +21,7 @@ if (!/^\d+\.\d+\.\d+(-\w+(\.\d+)?)?$/.test(newVersion)) {
 
 // Apply the -beta suffix if it's a beta version and doesn't already have a suffix
 let versionWithSuffix = newVersion;
-if (isBeta && !newVersion.includes("-")) {
+if (isBeta && !newVersion.includes("-beta")) {
   versionWithSuffix = `${newVersion}-beta`;
 }
 
@@ -48,14 +48,16 @@ try {
   process.exit(1);
 }
 
-// Update manifest.json
+// Update the correct manifest file
+const manifestFileToUpdate = isBeta ? "manifest-beta.json" : "manifest.json";
 try {
-  const manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
+  const manifest = JSON.parse(readFileSync(manifestFileToUpdate, "utf8"));
   manifest.version = versionWithSuffix;
-  writeFileSync("manifest.json", JSON.stringify(manifest, null, 2) + "\n");
-  console.log(`✅ Updated manifest.json`);
+  writeFileSync(manifestFileToUpdate, JSON.stringify(manifest, null, 2) + "\n");
+  console.log(`✅ Updated ${manifestFileToUpdate}`);
 } catch (error) {
-  console.error(`❌ Failed to update manifest.json:`, error.message);
+  console.error(`❌ Failed to update ${manifestFileToUpdate}:`, error.message);
+  if (isBeta) console.error("Make sure manifest-beta.json exists for beta releases.");
   process.exit(1);
 }
 
@@ -72,12 +74,12 @@ try {
 
 // Create git commit and tag
 try {
-  // Only include manifest.json in the commit for non-beta versions
-  const filesToCommit = isBeta ? ["package.json", "versions.json"] : ["package.json", "manifest.json", "versions.json"];
+  // Always commit package.json and versions.json, and the manifest we touched
+  const filesToCommit = ["package.json", "versions.json", manifestFileToUpdate];
 
   execSync(`git add ${filesToCommit.join(" ")}`);
-  execSync(`git commit -m "Bump version to ${versionWithSuffix}${isBeta ? " (beta)" : ""}"`);
-  execSync(`git tag -a ${versionWithSuffix} -m "Version ${versionWithSuffix}${isBeta ? " (beta)" : ""}"`);
+  execSync(`git commit -m "Bump version to ${versionWithSuffix}"`);
+  execSync(`git tag -a ${versionWithSuffix} -m "Version ${versionWithSuffix}"`);
 
   console.log(`✅ Created git commit and tag ${versionWithSuffix}`);
   console.log("\nNext steps:");

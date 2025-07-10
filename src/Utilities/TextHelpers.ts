@@ -77,7 +77,7 @@ const generateDatePattern = (format: string) => {
     .replace("mm", "\\d{2}") // Match exactly two digits for the minute
     .replace("ss", "\\d{2}"); // Match exactly two digits for the second
 
-  return new RegExp(`^${pattern}$`);
+  return new RegExp(`^${pattern}`);
 };
 
 export const isTitleTimestampFormat = (title: string = "", dateFormat: string): boolean => {

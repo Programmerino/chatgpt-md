@@ -44,6 +44,8 @@ export interface ChatBehaviorSettings {
   autoInferTitle: boolean;
   /** Whether to disable the plugin's system message */
   disablePluginSystemMessage: boolean;
+  /** Command to run after generation is complete (Desktop only) */
+  postGenerationCommand: string;
 }
 
 /**
@@ -120,6 +122,7 @@ export const DEFAULT_SETTINGS: ChatGPT_MDSettings = {
   generateAtCursor: false,
   autoInferTitle: false,
   disablePluginSystemMessage: false,
+  postGenerationCommand: "",
 
   // Formatting
   dateFormat: DEFAULT_DATE_FORMAT,

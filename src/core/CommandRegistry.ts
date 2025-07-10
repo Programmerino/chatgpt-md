@@ -1,4 +1,5 @@
 import { Editor, MarkdownView, Notice, Platform, Plugin } from "obsidian";
+import { exec } from "child_process";
 import { ServiceLocator } from "./ServiceLocator";
 import { SettingsService } from "../Services/SettingsService";
 import { IAiApiService } from "src/Services/AiService";
@@ -114,6 +115,37 @@ export class CommandRegistry {
   }
 
   /**
+   * Executes a command after the AI response is finished.
+   */
+  private async runPostGenerationCommand(): Promise<void> {
+    const settings = this.settingsService.getSettings();
+    const command = settings.postGenerationCommand;
+
+    if (!command) {
+      return;
+    }
+
+    if (!Platform.isDesktop) {
+      console.log("[ChatGPT MD] Post-generation command skipped on mobile.");
+      return;
+    }
+
+    exec(command, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`[ChatGPT MD] Error executing post-generation command: ${error.message}`);
+        new Notice(`[ChatGPT MD] Failed to run post-generation command: ${command}`);
+        return;
+      }
+      if (stderr) {
+        console.warn(`[ChatGPT MD] Post-generation command stderr:\n${stderr}`);
+      }
+      if (stdout) {
+        console.log(`[ChatGPT MD] Post-generation command stdout:\n${stdout}`);
+      }
+    });
+  }
+
+  /**
    * Register the main chat command
    */
   private registerChatCommand(): void {
@@ -161,6 +193,7 @@ export class CommandRegistry {
           if (!response.wasAborted) {
             // Don't infer title if chat was aborted
             await this.handleAutoTitleInference(view, frontmatter, messages);
+            await this.runPostGenerationCommand();
           }
         } catch (err) {
           if (err.name === "AbortError") {
