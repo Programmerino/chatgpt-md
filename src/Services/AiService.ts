@@ -60,10 +60,10 @@ export abstract class BaseAiService implements IAiApiService {
   protected readonly errorService: ErrorService;
   protected readonly notificationService: NotificationService;
 
-  constructor(errorService?: ErrorService, notificationService?: NotificationService) {
+  constructor(apiService: ApiService, errorService?: ErrorService, notificationService?: NotificationService) {
+    this.apiService = apiService;
     this.notificationService = notificationService ?? new NotificationService();
     this.errorService = errorService ?? new ErrorService(this.notificationService);
-    this.apiService = new ApiService(this.errorService, this.notificationService);
     this.apiAuthService = new ApiAuthService(this.notificationService);
     this.apiResponseParser = new ApiResponseParser(this.notificationService);
   }
@@ -285,11 +285,11 @@ export abstract class BaseAiService implements IAiApiService {
     settings?: ChatGPT_MDSettings,
     callbacks?: StreamCallbacks
   ): Promise<StreamingResponse> {
+    let headerStartCursor: EditorPosition | undefined;
+    let contentStartCursor: EditorPosition | undefined;
+
     try {
       const { payload, headers } = this.prepareApiCall(apiKey, messages, config, false, settings);
-
-      let headerStartCursor: EditorPosition | undefined;
-      let contentStartCursor: EditorPosition | undefined;
 
       if (editor && !callbacks) {
         if (!setAtCursor) {
@@ -312,19 +312,30 @@ export abstract class BaseAiService implements IAiApiService {
         this.serviceType
       );
 
-      const result = await this.apiResponseParser.processStreamResponse(
+      const resultText = await this.apiResponseParser.processStreamResponse(
         response,
         this.serviceType,
         editor,
         contentStartCursor,
-        headerStartCursor,
-        this.apiService,
         callbacks
       );
 
-      return this.processStreamingResult(result);
+      return { fullString: resultText, mode: "streaming", wasAborted: false };
     } catch (err) {
-      const errorMessage = `Error: ${err}`;
+      if (err.name === "AbortError") {
+        console.log("[ChatGPT MD] Stream was aborted by user.");
+        if (editor && headerStartCursor && contentStartCursor) {
+          // Clean up the partial header that was inserted
+          const currentCursor = editor.getCursor();
+          editor.replaceRange("", headerStartCursor, currentCursor);
+        }
+        callbacks?.onDone("");
+        return { fullString: "", mode: "streaming", wasAborted: true };
+      }
+      // Handle other types of errors during streaming
+      const errorMessage = `Error during streaming: ${err.message || err}`;
+      console.error(`[ChatGPT MD]`, errorMessage);
+      callbacks?.onDone("");
       return { fullString: errorMessage, mode: "streaming" };
     }
   }

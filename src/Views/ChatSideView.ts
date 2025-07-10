@@ -82,18 +82,37 @@ export class ChatSideView extends ItemView {
     this.textInput = this.inputForm.createEl("textarea", {
       placeholder: "Type your message...",
     });
-    this.sendButton = this.inputForm.createEl("button", { type: "submit" });
-    setIcon(this.sendButton, "send");
+    this.sendButton = this.inputForm.createEl("button", { type: "button" }); // Changed to type="button"
+    this.setButtonState("idle");
 
+    // Unified click handler for the button
+    this.sendButton.onclick = (e) => {
+      e.preventDefault();
+      if (this.isAwaitingResponse) {
+        console.log("[ChatGPT MD] Stop button clicked.");
+        this.chatService.cancelRequest();
+        new Notice("AI generation stopped.");
+      } else {
+        this.handleSendMessage();
+      }
+    };
+
+    // Form submission now triggers the button click
     this.inputForm.onsubmit = (e) => {
       e.preventDefault();
-      this.handleSendMessage();
+      this.sendButton.click();
     };
+
+    this.textInput.addEventListener("input", () => {
+      if (!this.isAwaitingResponse) {
+        this.sendButton.disabled = this.textInput.value.trim().length === 0;
+      }
+    });
 
     this.textInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        this.handleSendMessage();
+        this.sendButton.click();
       }
     });
 
@@ -116,6 +135,22 @@ export class ChatSideView extends ItemView {
 
   async onClose() {
     // Cleanup if needed
+  }
+
+  private setButtonState(state: "idle" | "generating") {
+    if (state === "generating") {
+      this.isAwaitingResponse = true;
+      this.sendButton.disabled = false;
+      setIcon(this.sendButton, "square");
+      this.sendButton.setAttribute("aria-label", "Stop generation");
+      this.sendButton.classList.add("is-sending");
+    } else {
+      this.isAwaitingResponse = false;
+      this.sendButton.disabled = this.textInput.value.trim().length === 0;
+      setIcon(this.sendButton, "send");
+      this.sendButton.setAttribute("aria-label", "Send message");
+      this.sendButton.classList.remove("is-sending");
+    }
   }
 
   async renderConversation() {
@@ -259,9 +294,8 @@ export class ChatSideView extends ItemView {
       return;
     }
 
-    this.isAwaitingResponse = true;
-    this.sendButton.disabled = true;
     this.textInput.value = "";
+    this.setButtonState("generating");
 
     // Optimistic UI update
     this.addMessageToView({ role: "user", content: message });
@@ -277,8 +311,7 @@ export class ChatSideView extends ItemView {
       this.finalizeAssistantMessage(""); // Clear the assistant bubble on error
       new Notice("An error occurred while sending the message. Check the console for details.");
     } finally {
-      this.isAwaitingResponse = false;
-      this.sendButton.disabled = false;
+      this.setButtonState("idle");
       this.textInput.focus();
       // Manually trigger a final update to sync the view with the file's ground truth.
       this.scheduleUpdate();

@@ -5,6 +5,8 @@ import { BaseAiService, IAiApiService, OpenAiModel, StreamCallbacks } from "./Ai
 import { ChatGPT_MDSettings } from "src/Models/Config";
 import { ApiService } from "./ApiService";
 import { ApiAuthService, isValidApiKey } from "./ApiAuthService";
+import { ErrorService } from "./ErrorService";
+import { NotificationService } from "./NotificationService";
 
 export const DEFAULT_OPENAI_CONFIG: OpenAIConfig = {
   aiService: AI_SERVICE_OPENAI,
@@ -54,6 +56,10 @@ export const fetchAvailableOpenAiModels = async (url: string, apiKey: string) =>
 
 export class OpenAiService extends BaseAiService implements IAiApiService {
   protected serviceType = AI_SERVICE_OPENAI;
+
+  constructor(apiService: ApiService, errorService?: ErrorService, notificationService?: NotificationService) {
+    super(apiService, errorService, notificationService);
+  }
 
   getApiKeyFromSettings(settings: ChatGPT_MDSettings): string {
     return this.apiAuthService.getApiKey(settings, AI_SERVICE_OPENAI);

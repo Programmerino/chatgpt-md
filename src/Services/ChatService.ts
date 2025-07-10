@@ -30,6 +30,10 @@ export class ChatService {
     return this.streaming;
   }
 
+  public cancelRequest(): void {
+    this.serviceLocator.getApiService().cancelRequest();
+  }
+
   private async _callAndProcessAI(
     file: TFile,
     messagesWithRole: any[],

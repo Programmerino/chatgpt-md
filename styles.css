@@ -139,8 +139,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background-color 0.15s ease-in-out;
 }
 
 .chat-input-container button:hover {
   background-color: var(--interactive-accent-hover);
+}
+
+.chat-input-container button.is-sending {
+  background-color: var(--background-modifier-error);
+}
+
+.chat-input-container button.is-sending:hover {
+  background-color: var(--background-modifier-error-hover);
 }

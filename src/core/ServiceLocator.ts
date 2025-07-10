@@ -99,7 +99,8 @@ export class ServiceLocator {
    */
   getAiApiService(serviceType: string): IAiApiService {
     // Only OpenAI is supported now, so we can simplify this.
-    return new OpenAiService(this.errorService, this.notificationService);
+    // Pass the singleton services to the constructor
+    return new OpenAiService(this.apiService, this.errorService, this.notificationService);
   }
 
   // Getters for all services

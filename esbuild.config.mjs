@@ -53,11 +53,11 @@ const context = await esbuild.context({
     legalComments: "none", // Remove all comments to reduce size
     keepNames: false, // Allow name mangling for smaller bundles
 
-    // Dead code elimination
-    drop: ["console", "debugger"], // Remove console.log and debugger statements
+    // // Dead code elimination
+    // drop: ["console", "debugger"], // Remove console.log and debugger statements
 
-    // Pure annotations for better tree shaking
-    pure: ["console.log", "console.info", "console.warn", "console.debug", "console.trace"],
+    // // Pure annotations for better tree shaking
+    // pure: ["console.log", "console.info", "console.warn", "console.debug", "console.trace"],
 
     // Platform-specific optimizations
     platform: "node",

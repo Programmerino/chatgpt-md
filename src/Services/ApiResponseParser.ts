@@ -2,7 +2,6 @@ import { ROLE_ASSISTANT, AI_SERVICE_OPENAI } from "src/Constants";
 import { Editor, EditorPosition } from "obsidian";
 import { NotificationService } from "./NotificationService";
 import { getHeaderRole, unfinishedCodeBlock, calculateEndPosition } from "src/Utilities/TextHelpers";
-import { ApiService } from "./ApiService";
 
 interface StreamCallbacks {
   onChunk: (chunk: string) => void;
@@ -54,53 +53,33 @@ export class ApiResponseParser {
     serviceType: string,
     editor: Editor | undefined,
     contentStartCursor: EditorPosition | undefined,
-    headerStartCursor: EditorPosition | undefined,
-    apiService?: ApiService,
     callbacks?: StreamCallbacks
-  ): Promise<{ text: string; wasAborted: boolean }> {
+  ): Promise<string> {
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let text = "";
-    let wasAborted = false;
 
     let currentInsertPosition = contentStartCursor;
 
-    try {
-      while (true) {
-        if (apiService?.wasAborted()) {
-          wasAborted = true;
-          break;
-        }
+    // This loop will be broken externally by an AbortError if cancelled.
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
 
-        const { value, done } = await reader.read();
-        if (done) break;
+      const chunk = decoder.decode(value);
+      const lines = chunk.split("\n");
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split("\n");
-
-        for (const line of lines) {
-          const contentChunk = this.processStreamLine(line);
-          if (contentChunk) {
-            text += contentChunk;
-            if (editor && currentInsertPosition) {
-              editor.replaceRange(contentChunk, currentInsertPosition);
-              currentInsertPosition = calculateEndPosition(currentInsertPosition, contentChunk);
-            }
-            callbacks?.onChunk(contentChunk);
+      for (const line of lines) {
+        const contentChunk = this.processStreamLine(line);
+        if (contentChunk) {
+          text += contentChunk;
+          if (editor && currentInsertPosition) {
+            editor.replaceRange(contentChunk, currentInsertPosition);
+            currentInsertPosition = calculateEndPosition(currentInsertPosition, contentChunk);
           }
+          callbacks?.onChunk(contentChunk);
         }
       }
-    } catch (error) {
-      console.error("Error processing stream:", error);
-    }
-
-    if (wasAborted) {
-      apiService?.resetAbortedFlag();
-      if (editor && headerStartCursor) {
-        editor.replaceRange("", headerStartCursor, currentInsertPosition);
-      }
-      callbacks?.onDone("");
-      return { text: "", wasAborted: true };
     }
 
     if (unfinishedCodeBlock(text)) {
@@ -129,6 +108,6 @@ export class ApiResponseParser {
 
     callbacks?.onDone(text);
 
-    return { text, wasAborted };
+    return text;
   }
 }
