@@ -30,7 +30,6 @@ export interface IAiApiService {
     messages: Message[],
     options: Record<string, any>,
     headingPrefix: string,
-    url: string,
     editor?: Editor,
     setAtCursor?: boolean,
     apiKey?: string,
@@ -121,18 +120,12 @@ export abstract class BaseAiService implements IAiApiService {
     messages: Message[],
     options: Record<string, any> = {},
     headingPrefix: string,
-    url: string,
     editor?: Editor,
     setAtCursor?: boolean,
     apiKey?: string,
     settings?: ChatGPT_MDSettings
   ): Promise<any> {
-    const config = { ...this.getDefaultConfig(), ...options };
-
-    // Use URL from settings if available
-    if (settings) {
-      config.url = url;
-    }
+    const config = options;
 
     return options.stream && editor
       ? this.callStreamingAPI(apiKey, messages, config, editor, headingPrefix, setAtCursor, settings)

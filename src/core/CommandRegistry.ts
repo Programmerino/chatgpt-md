@@ -2,7 +2,7 @@ import { Editor, MarkdownView, Notice, Platform, Plugin } from "obsidian";
 import { ServiceLocator } from "./ServiceLocator";
 import { SettingsService } from "../Services/SettingsService";
 import { IAiApiService } from "src/Services/AiService";
-import { AiModelSuggestModal } from "src/Views/AiModelSuggestModel";
+import { AiModelSuggestModal } from "src/Views/AiModelSuggestModal";
 import { DEFAULT_OPENAI_CONFIG, fetchAvailableOpenAiModels } from "src/Services/OpenAiService";
 import { DEFAULT_OLLAMA_CONFIG, fetchAvailableOllamaModels } from "src/Services/OllamaService";
 import { DEFAULT_OPENROUTER_CONFIG, fetchAvailableOpenRouterModels } from "src/Services/OpenRouterService";
@@ -148,7 +148,6 @@ export class CommandRegistry {
             messagesWithRole,
             frontmatter,
             getHeadingPrefix(settings.headingLevel),
-            this.getAiApiUrls(frontmatter)[frontmatter.aiService],
             editor,
             settings.generateAtCursor,
             apiKeyToUse,
@@ -407,7 +406,6 @@ ${payloadString}
           ...settings,
           ...frontmatter,
           openrouterApiKey: this.apiAuthService.getApiKey(settings, AI_SERVICE_OPENROUTER),
-          url: this.getAiApiUrls(frontmatter)[frontmatter.aiService],
         };
 
         await this.aiService.inferTitle(view, settingsWithApiKey, messages, editorService);

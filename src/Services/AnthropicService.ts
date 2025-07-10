@@ -11,12 +11,10 @@ import { NotificationService } from "./NotificationService";
 
 export const DEFAULT_ANTHROPIC_CONFIG: AnthropicConfig = {
   aiService: AI_SERVICE_ANTHROPIC,
-  max_tokens: 1024,
   model: "anthropic@claude-3-5-sonnet-latest",
   stream: true,
   system_commands: null,
   tags: [],
-  temperature: 1,
   title: "Untitled",
   url: "https://api.anthropic.com",
 };
@@ -114,11 +112,13 @@ export class AnthropicService extends BaseAiService implements IAiApiService {
     const payload: AnthropicStreamPayload = {
       model: modelName,
       messages: anthropicMessages,
-      max_tokens: config.max_tokens,
-      stream: config.stream,
+      stream: !!config.stream,
     };
 
-    // Add temperature if available
+    // Add optional parameters if they exist
+    if (config.max_tokens !== undefined) {
+      payload.max_tokens = config.max_tokens;
+    }
     if (config.temperature !== undefined) {
       payload.temperature = config.temperature;
     }
@@ -245,19 +245,19 @@ export interface AnthropicStreamPayload {
   model: string;
   messages: AnthropicMessage[];
   system?: string;
-  max_tokens: number;
+  max_tokens?: number;
   stream: boolean;
   temperature?: number;
 }
 
 export interface AnthropicConfig {
   aiService: string;
-  max_tokens: number;
+  max_tokens?: number;
   model: string;
   stream: boolean;
-  system_commands: string[] | null;
-  tags: string[] | null;
-  temperature: number;
-  title: string;
+  system_commands?: string[] | null;
+  tags?: string[] | null;
+  temperature?: number;
+  title?: string;
   url: string;
 }

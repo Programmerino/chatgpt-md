@@ -19,7 +19,7 @@ export interface OllamaConfig {
   aiService: string;
   model: string;
   url: string;
-  stream: boolean;
+  stream?: boolean;
   title?: string;
   system_commands?: string[] | null;
 }
@@ -104,7 +104,7 @@ export class OllamaService extends BaseAiService implements IAiApiService {
     return {
       model: modelName,
       messages: processedMessages,
-      stream: config.stream,
+      stream: !!config.stream,
     };
   }
 

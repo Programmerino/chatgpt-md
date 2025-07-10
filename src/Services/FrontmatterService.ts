@@ -45,7 +45,7 @@ export class FrontmatterService {
       : {};
 
     // Merge configurations with proper priority order
-    const mergedConfig = { ...settings, ...defaultFrontmatter, ...frontmatter } as Record<string, any>;
+    const mergedConfig: Record<string, any> = { ...settings, ...defaultFrontmatter, ...frontmatter };
 
     // Determine AI service
     const aiService =
@@ -54,7 +54,10 @@ export class FrontmatterService {
       aiProviderFromKeys(mergedConfig) ||
       AI_SERVICE_OPENAI;
 
-    // Get default config for the determined service
+    mergedConfig.aiService = aiService;
+
+    // This is the place to ensure the correct URL is used.
+    const serviceUrlKey = `${aiService}Url` as keyof ChatGPT_MDSettings;
     const serviceDefaults: Record<string, any> = {
       [AI_SERVICE_OPENAI]: DEFAULT_OPENAI_CONFIG,
       [AI_SERVICE_OLLAMA]: DEFAULT_OLLAMA_CONFIG,
@@ -62,16 +65,10 @@ export class FrontmatterService {
       [AI_SERVICE_LMSTUDIO]: DEFAULT_LMSTUDIO_CONFIG,
       [AI_SERVICE_ANTHROPIC]: DEFAULT_ANTHROPIC_CONFIG,
     };
-    const defaultConfig = serviceDefaults[aiService] || DEFAULT_OPENAI_CONFIG;
 
-    // Return final configuration with everything merged
-    return {
-      ...defaultConfig,
-      ...settings,
-      ...defaultFrontmatter,
-      ...frontmatter,
-      aiService,
-    };
+    mergedConfig.url = mergedConfig[serviceUrlKey] || settings[serviceUrlKey] || serviceDefaults[aiService]?.url;
+
+    return mergedConfig;
   }
 
   /**

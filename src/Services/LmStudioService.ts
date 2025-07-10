@@ -11,16 +11,11 @@ import { NotificationService } from "./NotificationService";
 
 export const DEFAULT_LMSTUDIO_CONFIG: LmStudioConfig = {
   aiService: AI_SERVICE_LMSTUDIO,
-  frequency_penalty: 0,
-  max_tokens: 300,
   model: "local-model",
-  presence_penalty: 0,
   stream: true,
   system_commands: null,
   tags: [],
-  temperature: 1,
   title: "Untitled",
-  top_p: 1,
   url: "http://localhost:1234",
 };
 
@@ -109,13 +104,15 @@ export class LmStudioService extends BaseAiService implements IAiApiService {
     const payload: LmStudioStreamPayload = {
       model: modelName,
       messages: processedMessages,
-      max_completion_tokens: config.max_tokens,
-      stream: config.stream,
-      temperature: config.temperature,
-      top_p: config.top_p,
-      presence_penalty: config.presence_penalty,
-      frequency_penalty: config.frequency_penalty,
+      stream: !!config.stream,
     };
+
+    // Add optional parameters if they exist
+    if (config.max_tokens !== undefined) payload.max_tokens = config.max_tokens;
+    if (config.temperature !== undefined) payload.temperature = config.temperature;
+    if (config.top_p !== undefined) payload.top_p = config.top_p;
+    if (config.presence_penalty !== undefined) payload.presence_penalty = config.presence_penalty;
+    if (config.frequency_penalty !== undefined) payload.frequency_penalty = config.frequency_penalty;
 
     return payload;
   }
@@ -151,25 +148,25 @@ export class LmStudioService extends BaseAiService implements IAiApiService {
 export interface LmStudioStreamPayload {
   model: string;
   messages: Array<Message>;
-  temperature: number;
-  top_p: number;
-  presence_penalty: number;
-  frequency_penalty: number;
-  max_completion_tokens: number;
+  temperature?: number;
+  top_p?: number;
+  presence_penalty?: number;
+  frequency_penalty?: number;
+  max_tokens?: number;
   stream: boolean;
 }
 
 export interface LmStudioConfig {
   aiService: string;
-  frequency_penalty: number;
-  max_tokens: number;
+  frequency_penalty?: number;
+  max_tokens?: number;
   model: string;
-  presence_penalty: number;
-  stream: boolean;
-  system_commands: string[] | null;
-  tags: string[] | null;
-  temperature: number;
-  title: string;
-  top_p: number;
+  presence_penalty?: number;
+  stream?: boolean;
+  system_commands?: string[] | null;
+  tags?: string[] | null;
+  temperature?: number;
+  title?: string;
+  top_p?: number;
   url: string;
 }

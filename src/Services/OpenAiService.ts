@@ -1,6 +1,6 @@
 import { Editor } from "obsidian";
 import { Message } from "src/Models/Message";
-import { AI_SERVICE_OPENAI, ROLE_DEVELOPER } from "src/Constants";
+import { AI_SERVICE_OPENAI, ROLE_SYSTEM } from "src/Constants";
 import { BaseAiService, IAiApiService, OpenAiModel } from "./AiService";
 import { ChatGPT_MDSettings } from "src/Models/Config";
 import { ApiService } from "./ApiService";
@@ -11,16 +11,11 @@ import { NotificationService } from "./NotificationService";
 
 export const DEFAULT_OPENAI_CONFIG: OpenAIConfig = {
   aiService: AI_SERVICE_OPENAI,
-  frequency_penalty: 0,
-  max_tokens: 300,
   model: "openai@gpt-4",
-  presence_penalty: 0,
   stream: true,
   system_commands: null,
   tags: [],
-  temperature: 1,
   title: "Untitled",
-  top_p: 1,
   url: "https://api.openai.com",
 };
 
@@ -97,7 +92,7 @@ export class OpenAiService extends BaseAiService implements IAiApiService {
 
   // Implement abstract methods from BaseAiService
   protected getSystemMessageRole(): string {
-    return ROLE_DEVELOPER; // OpenAI prefers developer role for system messages
+    return ROLE_SYSTEM;
   }
 
   protected supportsSystemField(): boolean {
@@ -115,19 +110,20 @@ export class OpenAiService extends BaseAiService implements IAiApiService {
     const payload: OpenAIStreamPayload = {
       model: modelName,
       messages: processedMessages,
-      max_completion_tokens: config.max_tokens,
-      stream: config.stream,
+      stream: !!config.stream,
     };
 
     // Only include these parameters if the model supports them
     // o1, o4, and search models don't support custom temperature and other parameters
     const isRestrictedModel = modelName.includes("search") || modelName.includes("o1") || modelName.includes("o4");
 
+    if (config.max_tokens !== undefined) payload.max_tokens = config.max_tokens;
+
     if (!isRestrictedModel) {
-      payload.temperature = config.temperature;
-      payload.top_p = config.top_p;
-      payload.presence_penalty = config.presence_penalty;
-      payload.frequency_penalty = config.frequency_penalty;
+      if (config.temperature !== undefined) payload.temperature = config.temperature;
+      if (config.top_p !== undefined) payload.top_p = config.top_p;
+      if (config.presence_penalty !== undefined) payload.presence_penalty = config.presence_penalty;
+      if (config.frequency_penalty !== undefined) payload.frequency_penalty = config.frequency_penalty;
     }
 
     return payload;
@@ -168,21 +164,21 @@ export interface OpenAIStreamPayload {
   top_p?: number;
   presence_penalty?: number;
   frequency_penalty?: number;
-  max_completion_tokens: number;
+  max_tokens?: number;
   stream: boolean;
 }
 
 export interface OpenAIConfig {
   aiService: string;
-  frequency_penalty: number;
-  max_tokens: number;
+  frequency_penalty?: number;
+  max_tokens?: number;
   model: string;
-  presence_penalty: number;
-  stream: boolean;
-  system_commands: string[] | null;
-  tags: string[] | null;
-  temperature: number;
-  title: string;
-  top_p: number;
+  presence_penalty?: number;
+  stream?: boolean;
+  system_commands?: string[] | null;
+  tags?: string[] | null;
+  temperature?: number;
+  title?: string;
+  top_p?: number;
   url: string;
 }
