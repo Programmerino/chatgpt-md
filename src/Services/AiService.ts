@@ -1,4 +1,4 @@
-import { Editor, MarkdownView } from "obsidian";
+import { Editor, MarkdownView, Platform } from "obsidian";
 import { Message } from "src/Models/Message";
 import { ApiService } from "./ApiService";
 import { ApiAuthService, isValidApiKey } from "./ApiAuthService";
@@ -40,6 +40,11 @@ export interface IAiApiService {
     mode: string;
     wasAborted?: boolean;
   }>;
+
+  /**
+   * Cancels the current API request
+   */
+  cancelRequest(): void;
 
   /**
    * Infer a title from messages
@@ -170,6 +175,10 @@ export abstract class BaseAiService implements IAiApiService {
         return "";
       }
     } catch (error) {
+      if (error.name === "AbortError") {
+        this.notificationService.showWarning("Title inference cancelled.");
+        return "";
+      }
       console.error("[ChatGPT MD] Error in inferTitle:", error);
       this.showNoTitleInferredNotification();
       return "";
@@ -258,11 +267,17 @@ export abstract class BaseAiService implements IAiApiService {
           settings
         );
       } catch (apiError) {
+        if (apiError.name === "AbortError") {
+          throw apiError;
+        }
         // Log the error but don't return it to the chat
         console.error(`[ChatGPT MD] Error calling API for title inference:`, apiError);
         return "";
       }
     } catch (err) {
+      if (err.name === "AbortError") {
+        throw err;
+      }
       console.error(`[ChatGPT MD] Error inferring title:`, err);
       this.showNoTitleInferredNotification();
       return "";
@@ -297,10 +312,10 @@ export abstract class BaseAiService implements IAiApiService {
   }
 
   /**
-   * Stop streaming
+   * Stop any ongoing API request
    */
-  public stopStreaming(): void {
-    this.apiService?.stopStreaming();
+  public cancelRequest(): void {
+    this.apiService?.cancelRequest();
   }
 
   /**
@@ -498,6 +513,11 @@ export abstract class BaseAiService implements IAiApiService {
       // Return simple object with response and model
       return { fullString: response, model: payload.model };
     } catch (err) {
+      if (err.name === "AbortError") {
+        // Re-throw to be handled by the command registry.
+        throw err;
+      }
+
       const isTitleInference =
         messages.length === 1 && messages[0].content?.toString().includes("Infer title from the summary");
 

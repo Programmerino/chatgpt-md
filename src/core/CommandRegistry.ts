@@ -27,7 +27,7 @@ import {
   MOVE_TO_CHAT_COMMAND_ID,
   NEWLINE,
   ROLE_USER,
-  STOP_STREAMING_COMMAND_ID,
+  STOP_GENERATING_COMMAND_ID,
 } from "src/Constants";
 import { getHeadingPrefix, isTitleTimestampFormat } from "src/Utilities/TextHelpers";
 import { ApiAuthService, isValidApiKey } from "../Services/ApiAuthService";
@@ -60,7 +60,7 @@ export class CommandRegistry {
     this.registerSelectModelCommand();
     this.registerAddDividerCommand();
     this.registerAddCommentBlockCommand();
-    this.registerStopStreamingCommand();
+    this.registerCancelGenerationCommand();
     this.registerInferTitleCommand();
     this.registerMoveToNewChatCommand();
     this.registerChooseChatTemplateCommand();
@@ -97,7 +97,7 @@ export class CommandRegistry {
           if (Platform.isMobile) {
             new Notice(`[ChatGPT MD] Calling ${frontmatter.model}`);
           } else {
-            this.updateStatusBar(`Calling ${frontmatter.model}`);
+            this.updateStatusBar(`Calling ${frontmatter.model}... (use 'Stop AI Generation' to cancel)`);
           }
 
           // Get the appropriate API key for the service
@@ -154,6 +154,18 @@ export class CommandRegistry {
             await this.aiService.inferTitle(view, settingsWithApiKey, messages, editorService);
           }
         } catch (err) {
+          if (err.name === "AbortError") {
+            const message = "[ChatGPT MD] Request cancelled.";
+            if (Platform.isMobile) {
+              new Notice(message);
+            } else {
+              this.updateStatusBar("Request cancelled.");
+              setTimeout(() => this.updateStatusBar(""), 3000); // Clear after 3s
+            }
+            // Do not log to console for user-initiated aborts.
+            return;
+          }
+
           if (Platform.isMobile) {
             new Notice(`[ChatGPT MD] Calling ${frontmatter.model}. ` + err, 9000);
           }
@@ -278,22 +290,17 @@ export class CommandRegistry {
   }
 
   /**
-   * Register the stop streaming command
+   * Register the stop/cancel command
    */
-  private registerStopStreamingCommand(): void {
+  private registerCancelGenerationCommand(): void {
     this.plugin.addCommand({
-      id: STOP_STREAMING_COMMAND_ID,
-      name: "Stop streaming",
+      id: STOP_GENERATING_COMMAND_ID,
+      name: "Stop AI Generation",
       icon: "octagon",
       callback: () => {
-        // Use the aiService's stopStreaming method if available
-        if (this.aiService && "stopStreaming" in this.aiService) {
-          // @ts-ignore - Call the stopStreaming method
-          this.aiService.stopStreaming();
-        } else {
-          // No active AI service to stop streaming
-          this.serviceLocator.getNotificationService().showWarning("No active streaming request to stop");
-        }
+        // The ApiService holds the abort controller for the currently active request.
+        this.serviceLocator.getApiService().cancelRequest();
+        new Notice("Stop command issued.");
       },
     });
   }

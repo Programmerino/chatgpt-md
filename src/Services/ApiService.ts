@@ -1,4 +1,4 @@
-import { requestUrl } from "obsidian";
+import { Platform, requestUrl } from "obsidian";
 import { ApiAuthService } from "./ApiAuthService";
 import { ApiResponseParser } from "./ApiResponseParser";
 import { ErrorService } from "./ErrorService";
@@ -82,35 +82,75 @@ export class ApiService {
     headers: Record<string, string>,
     serviceType: string
   ): Promise<any> {
-    try {
-      console.log(`[ChatGPT MD] Making non-streaming request to ${serviceType}`, payload);
+    // Use cancellable fetch on desktop, and Obsidian's requestUrl on mobile to avoid CORS issues.
+    if (!Platform.isMobile) {
+      // --- DESKTOP: Use fetch for cancellability ---
+      try {
+        console.log(`[ChatGPT MD] Making non-streaming request to ${serviceType} (Desktop)`, payload);
+        this.abortController = new AbortController();
 
-      const responseUrl = await requestUrl({
-        url,
-        method: "POST",
-        headers,
-        contentType: "application/json",
-        body: JSON.stringify(payload),
-        throw: false,
-      });
+        const response = await fetch(url, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload),
+          signal: this.abortController.signal,
+        });
 
-      const data = responseUrl.json;
+        this.abortController = null; // Request finished, clear controller.
 
-      if (data?.error) {
-        return this.errorService.handleApiError({ error: data.error }, serviceType, {
+        if (!response.ok) {
+          throw await this.handleHttpError(response, serviceType, payload, url);
+        }
+
+        const data = await response.json();
+
+        if (data?.error) {
+          return this.errorService.handleApiError({ error: data.error }, serviceType, {
+            returnForChat: true,
+            showNotification: true,
+            context: { model: payload.model, url },
+          });
+        }
+
+        return this.apiResponseParser.parseNonStreamingResponse(data, serviceType);
+      } catch (error) {
+        if (error.name === "AbortError") {
+          throw error;
+        }
+        return this.handleRequestError(error, serviceType, payload, url);
+      }
+    } else {
+      // --- MOBILE: Use requestUrl, non-cancellable ---
+      try {
+        console.log(`[ChatGPT MD] Making non-streaming request to ${serviceType} (Mobile)`, payload);
+
+        const responseUrl = await requestUrl({
+          url,
+          method: "POST",
+          headers,
+          contentType: "application/json",
+          body: JSON.stringify(payload),
+          throw: false,
+        });
+
+        const data = responseUrl.json;
+
+        if (data?.error) {
+          return this.errorService.handleApiError({ error: data.error }, serviceType, {
+            returnForChat: true,
+            showNotification: true,
+            context: { model: payload.model, url },
+          });
+        }
+
+        return this.apiResponseParser.parseNonStreamingResponse(data, serviceType);
+      } catch (error) {
+        return this.errorService.handleApiError(error, serviceType, {
           returnForChat: true,
           showNotification: true,
           context: { model: payload.model, url },
         });
       }
-
-      return this.apiResponseParser.parseNonStreamingResponse(data, serviceType);
-    } catch (error) {
-      return this.errorService.handleApiError(error, serviceType, {
-        returnForChat: true,
-        showNotification: true,
-        context: { model: payload.model, url },
-      });
     }
   }
 
@@ -176,9 +216,9 @@ export class ApiService {
   }
 
   /**
-   * Stop any ongoing streaming request
+   * Stop any ongoing API request
    */
-  stopStreaming(): void {
+  cancelRequest(): void {
     if (this.abortController) {
       this.wasStreamingAborted = true;
       this.abortController.abort();
