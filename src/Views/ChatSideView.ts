@@ -1,4 +1,14 @@
-import { ItemView, WorkspaceLeaf, MarkdownView, Notice, setIcon, MarkdownRenderer, TFile, debounce } from "obsidian";
+import {
+  ItemView,
+  WorkspaceLeaf,
+  MarkdownView,
+  Notice,
+  setIcon,
+  MarkdownRenderer,
+  TFile,
+  debounce,
+  Editor,
+} from "obsidian";
 import { ServiceLocator } from "../core/ServiceLocator";
 import { Message } from "../Models/Message";
 import { ChatService } from "src/Services/ChatService";
@@ -70,7 +80,16 @@ export class ChatSideView extends ItemView {
     this.registerEvent(
       this.app.workspace.on(
         "editor-change",
-        debounce(() => this.renderConversation(), 500, true)
+        debounce(
+          (_editor: Editor, view: MarkdownView) => {
+            // Re-render if the change happened in the file this view is tracking
+            if (view.file && this.currentChatFile && view.file.path === this.currentChatFile.path) {
+              this.renderConversation();
+            }
+          },
+          300,
+          true
+        )
       )
     );
 
@@ -103,7 +122,16 @@ export class ChatSideView extends ItemView {
       }
 
       this.textInput.disabled = false;
-      const fileContent = await this.app.vault.cachedRead(this.currentChatFile);
+      let fileContent: string;
+
+      // Prefer live content from the active editor.
+      if (activeView && activeView.file?.path === this.currentChatFile.path) {
+        fileContent = activeView.editor.getValue();
+      } else {
+        // Fallback to reading from vault for non-active files.
+        fileContent = await this.app.vault.read(this.currentChatFile);
+      }
+
       const editorService = this.serviceLocator.getEditorService();
       const settings = this.serviceLocator.getSettingsService().getSettings();
       const { messagesWithRole } = await editorService.getMessagesFromFileContent(fileContent, settings);
