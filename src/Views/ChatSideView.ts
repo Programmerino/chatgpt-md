@@ -26,6 +26,7 @@ export class ChatSideView extends ItemView {
   private currentAssistantMessageEl: HTMLElement | null = null;
   private currentAssistantMessageContent = "";
   private currentChatFile: TFile | null = null;
+  private isAwaitingResponse = false;
 
   constructor(leaf: WorkspaceLeaf, serviceLocator: ServiceLocator) {
     super(leaf);
@@ -72,8 +73,10 @@ export class ChatSideView extends ItemView {
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", (leaf) => {
         if (leaf?.view instanceof MarkdownView && leaf.view.file) {
-          this.currentChatFile = leaf.view.file;
-          this.renderConversation();
+          if (this.currentChatFile?.path !== leaf.view.file.path) {
+            this.currentChatFile = leaf.view.file;
+            this.renderConversation();
+          }
         }
       })
     );
@@ -82,6 +85,11 @@ export class ChatSideView extends ItemView {
         "editor-change",
         debounce(
           (_editor: Editor, view: MarkdownView) => {
+            // If we are waiting for a response, the sidebar will handle its own updates.
+            // Do not re-render from the file, as it will overwrite the optimistic UI.
+            if (this.isAwaitingResponse) {
+              return;
+            }
             // Re-render if the change happened in the file this view is tracking
             if (view.file && this.currentChatFile && view.file.path === this.currentChatFile.path) {
               this.renderConversation();
@@ -118,17 +126,21 @@ export class ChatSideView extends ItemView {
           cls: "chat-view-placeholder",
         });
         this.textInput.disabled = true;
+        this.textInput.placeholder = "Open a chat note to start talking...";
         return;
       }
 
       this.textInput.disabled = false;
+      this.textInput.placeholder = "Type your message...";
       let fileContent: string;
 
-      // Prefer live content from the active editor.
-      if (activeView && activeView.file?.path === this.currentChatFile.path) {
-        fileContent = activeView.editor.getValue();
+      const chatLeaf = this.app.workspace
+        .getLeavesOfType("markdown")
+        .find((l) => l.view instanceof MarkdownView && l.view.file?.path === this.currentChatFile?.path);
+
+      if (chatLeaf && chatLeaf.view instanceof MarkdownView) {
+        fileContent = chatLeaf.view.editor.getValue();
       } else {
-        // Fallback to reading from vault for non-active files.
         fileContent = await this.app.vault.read(this.currentChatFile);
       }
 
@@ -154,7 +166,7 @@ export class ChatSideView extends ItemView {
     });
     const contentEl = messageEl.createDiv({ cls: "chat-message-content" });
 
-    MarkdownRenderer.render(this.app, message.content, contentEl, "", this);
+    MarkdownRenderer.render(this.app, message.content, contentEl, this.currentChatFile?.path || "", this);
     this.scrollToBottom();
     return messageEl;
   }
@@ -163,7 +175,7 @@ export class ChatSideView extends ItemView {
     this.currentAssistantMessageContent = "";
     this.currentAssistantMessageEl = this.addMessageToView({
       role: "assistant",
-      content: "...",
+      content: "▋",
     });
   }
 
@@ -175,20 +187,27 @@ export class ChatSideView extends ItemView {
     const contentEl = this.currentAssistantMessageEl!.querySelector(".chat-message-content");
     if (contentEl) {
       contentEl.empty();
-      contentEl.createEl("p", {
-        text: this.currentAssistantMessageContent + "...",
-      }); // Simple text for streaming performance
+      MarkdownRenderer.render(
+        this.app,
+        this.currentAssistantMessageContent + " ▋",
+        contentEl as HTMLElement,
+        this.currentChatFile?.path || "",
+        this
+      );
       this.scrollToBottom();
     }
   }
 
   private finalizeAssistantMessage(fullText: string) {
-    this.currentAssistantMessageContent = fullText;
-    if (this.currentAssistantMessageEl) {
+    if (!this.currentAssistantMessageEl) return;
+
+    if (fullText.trim() === "") {
+      this.currentAssistantMessageEl.remove();
+    } else {
       const contentEl = this.currentAssistantMessageEl.querySelector(".chat-message-content");
       if (contentEl) {
         contentEl.empty();
-        MarkdownRenderer.render(this.app, this.currentAssistantMessageContent, contentEl as HTMLElement, "", this);
+        MarkdownRenderer.render(this.app, fullText, contentEl as HTMLElement, this.currentChatFile?.path || "", this);
         this.scrollToBottom();
       }
     }
@@ -198,21 +217,38 @@ export class ChatSideView extends ItemView {
 
   private async handleSendMessage() {
     const message = this.textInput.value.trim();
-    if (!message || this.chatService.isStreaming()) return;
+    if (!message || this.isAwaitingResponse) return;
 
     if (!this.currentChatFile) {
       new Notice("No chat note is active to send a message to.");
       return;
     }
 
+    this.isAwaitingResponse = true;
+    this.sendButton.disabled = true;
     this.textInput.value = "";
+
     this.addMessageToView({ role: "user", content: message });
     this.startNewAssistantMessage();
 
-    await this.chatService.sendMessageFromSidebar(message, this.currentChatFile, {
-      onChunk: (chunk: string) => this.appendChunkToView(chunk),
-      onDone: (fullText) => this.finalizeAssistantMessage(fullText),
-    });
+    try {
+      await this.chatService.sendMessageFromSidebar(message, this.currentChatFile, {
+        onChunk: (chunk: string) => this.appendChunkToView(chunk),
+        onDone: (fullText: string) => this.finalizeAssistantMessage(fullText),
+      });
+    } catch (err) {
+      console.error("[ChatGPT MD] Error sending message from sidebar:", err);
+      this.finalizeAssistantMessage(""); // Clear the assistant bubble on error
+      new Notice("An error occurred while sending the message. Check the console for details.");
+    } finally {
+      this.isAwaitingResponse = false;
+      this.sendButton.disabled = false;
+      this.textInput.focus();
+
+      // The final state sync. This ensures that even if something went wrong with the
+      // optimistic updates, the view will reflect the ground truth from the file.
+      await this.renderConversation();
+    }
   }
 
   private scrollToBottom() {
