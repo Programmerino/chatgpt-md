@@ -154,30 +154,8 @@ export class CommandRegistry {
       icon: "list",
       editorCallback: async (editor: Editor, view: MarkdownView) => {
         const editorService = this.serviceLocator.getEditorService();
-
-        const initialModal = new AiModelSuggestModal(this.plugin.app, view, editorService, this.availableModels);
-        initialModal.open();
-
-        (async () => {
-          try {
-            const freshModels = await this.fetchAvailableModels();
-
-            const currentModelsSet = new Set(this.availableModels);
-            const freshModelsSet = new Set(freshModels);
-            const areDifferent =
-              this.availableModels.length !== freshModels.length ||
-              ![...currentModelsSet].every((model) => freshModelsSet.has(model)) ||
-              ![...freshModelsSet].every((model) => currentModelsSet.has(model));
-
-            if (areDifferent && freshModels.length > 0) {
-              this.availableModels = freshModels;
-              initialModal.close();
-              new AiModelSuggestModal(this.plugin.app, view, editorService, this.availableModels).open();
-            }
-          } catch (e) {
-            console.error("[ChatGPT MD] Error fetching fresh models in background:", e);
-          }
-        })();
+        // Immediately open the modal with the promise for models
+        new AiModelSuggestModal(this.plugin.app, view, editorService, this.fetchAvailableModels()).open();
       },
     });
   }

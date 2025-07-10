@@ -6,6 +6,7 @@
 
 ## What's New 🚀
 - **✨ New Chat Sidebar:** A dedicated sidebar view for a more natural, conversational chat experience. Toggle it with the `ChatGPT MD: Toggle Chat Sidebar` command.
+- **⚙️ Inline Parameter Editing:** Click the new settings icon in the chat sidebar header to quickly tweak the model, system prompt, and temperature for the active chat note.
 - **Improved Streaming:** More reliable and performant streaming for both the editor and the new sidebar.
 - **Simplified Experience:** The plugin now focuses exclusively on providing the best possible OpenAI integration.
 

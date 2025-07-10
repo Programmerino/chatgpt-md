@@ -7,21 +7,29 @@ import {
   MarkdownRenderer,
   TFile,
   debounce,
-  Editor,
+  Setting,
 } from "obsidian";
 import { ServiceLocator } from "../core/ServiceLocator";
 import { Message } from "../Models/Message";
 import { ChatService } from "src/Services/ChatService";
+import { CommandRegistry } from "src/core/CommandRegistry";
+import { DEFAULT_OPENAI_CONFIG } from "src/Services/OpenAiService";
 
 export const CHAT_SIDE_VIEW_TYPE = "chat-side-view";
 
 export class ChatSideView extends ItemView {
   private serviceLocator: ServiceLocator;
   private chatService: ChatService;
+  private commandRegistry: CommandRegistry;
+
+  private headerEl: HTMLElement;
+  private paramsToggleBtn: HTMLElement;
+  private paramsEl: HTMLElement;
   private messageContainer: HTMLElement;
   private inputForm: HTMLFormElement;
   private textInput: HTMLTextAreaElement;
   private sendButton: HTMLButtonElement;
+
   private isRendering = false;
   private currentAssistantMessageEl: HTMLElement | null = null;
   private currentAssistantMessageContent = "";
@@ -33,6 +41,7 @@ export class ChatSideView extends ItemView {
     super(leaf);
     this.serviceLocator = serviceLocator;
     this.chatService = serviceLocator.getChatService();
+    this.commandRegistry = serviceLocator.getCommandRegistry();
     this.icon = "message-square";
   }
 
@@ -44,30 +53,53 @@ export class ChatSideView extends ItemView {
     return "ChatGPT MD Chat";
   }
 
-  // This is the primary handler for tracking which file the sidebar should be displaying.
-  private updateView = (): void => {
-    // This is the key fix: prevent re-rendering from file changes
-    // while we are streaming a response and using an optimistic UI.
-    if (this.isAwaitingResponse) {
-      return;
-    }
+  private updateView = async (): Promise<void> => {
+    if (this.isAwaitingResponse) return;
 
-    // getMostRecentLeaf is the key to stability. It finds the last active leaf
-    // in the main editor area, ignoring focus shifts to sidebars or other UI elements.
     const mostRecentMarkdownLeaf = this.app.workspace.getMostRecentLeaf(this.app.workspace.rootSplit);
-
     const newFile = mostRecentMarkdownLeaf?.view instanceof MarkdownView ? mostRecentMarkdownLeaf.view.file : null;
 
-    if (this.currentChatFile?.path !== newFile?.path) {
-      this.currentChatFile = newFile;
-      this.currentMessagesCache = "[]"; // Force re-render for a new file.
+    const fileChanged = this.currentChatFile?.path !== newFile?.path;
+    this.currentChatFile = newFile;
+
+    if (fileChanged) {
+      this.currentMessagesCache = "[]";
     }
 
-    // Always call renderConversation, as the content of the current file might have changed.
-    this.renderConversation();
+    if (this.currentChatFile) {
+      await this.updateForActiveFile(this.currentChatFile, fileChanged);
+    } else {
+      this.updateForNoFile();
+    }
   };
 
-  // A single debounced updater to prevent race conditions and event storms.
+  private async updateForActiveFile(file: TFile, fileChanged: boolean) {
+    this.textInput.disabled = false;
+    this.textInput.placeholder = "Type your message...";
+    this.updateHeader(file.basename);
+
+    if (fileChanged) {
+      this.paramsEl.style.display = "none";
+      this.paramsToggleBtn?.removeClass("is-active");
+    }
+
+    await this.renderParameters();
+    await this.renderConversation();
+  }
+
+  private updateForNoFile() {
+    this.updateHeader("No Chat Open");
+    this.paramsEl.empty();
+    this.paramsEl.style.display = "none";
+    this.messageContainer.empty();
+    this.messageContainer.createEl("p", {
+      text: "Open a chat note to see the conversation here.",
+      cls: "chat-view-placeholder",
+    });
+    this.textInput.disabled = true;
+    this.textInput.placeholder = "Open a chat note to start talking...";
+  }
+
   private scheduleUpdate = debounce(this.updateView, 100, true);
 
   async onOpen() {
@@ -75,6 +107,8 @@ export class ChatSideView extends ItemView {
     container.empty();
     container.addClass("chat-view-container");
 
+    this.headerEl = container.createDiv({ cls: "chat-view-header" });
+    this.paramsEl = container.createDiv({ cls: "chat-view-params", attr: { style: "display: none;" } });
     this.messageContainer = container.createDiv({ cls: "chat-messages" });
 
     const inputContainer = container.createDiv({ cls: "chat-input-container" });
@@ -82,22 +116,18 @@ export class ChatSideView extends ItemView {
     this.textInput = this.inputForm.createEl("textarea", {
       placeholder: "Type your message...",
     });
-    this.sendButton = this.inputForm.createEl("button", { type: "button" }); // Changed to type="button"
+    this.sendButton = this.inputForm.createEl("button", { type: "button" });
     this.setButtonState("idle");
 
-    // Unified click handler for the button
     this.sendButton.onclick = (e) => {
       e.preventDefault();
       if (this.isAwaitingResponse) {
-        console.log("[ChatGPT MD] Stop button clicked.");
         this.chatService.cancelRequest();
-        new Notice("AI generation stopped.");
       } else {
         this.handleSendMessage();
       }
     };
 
-    // Form submission now triggers the button click
     this.inputForm.onsubmit = (e) => {
       e.preventDefault();
       this.sendButton.click();
@@ -116,25 +146,43 @@ export class ChatSideView extends ItemView {
       }
     });
 
-    // All relevant events will trigger the same debounced update function.
     this.registerEvent(this.app.workspace.on("active-leaf-change", this.scheduleUpdate));
     this.registerEvent(this.app.workspace.on("editor-change", this.scheduleUpdate));
-
+    this.registerEvent(
+      this.app.vault.on("modify", (file) => {
+        if (file === this.currentChatFile && !this.isAwaitingResponse) {
+          this.scheduleUpdate();
+        }
+      })
+    );
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
         if (this.currentChatFile?.path === oldPath) {
-          // No need to call updateView directly, just schedule it
           this.scheduleUpdate();
         }
       })
     );
 
-    // Initial load
     this.scheduleUpdate();
   }
 
   async onClose() {
     // Cleanup if needed
+  }
+
+  private updateHeader(title: string) {
+    this.headerEl.empty();
+    this.headerEl.createEl("span", { text: title, cls: "chat-view-title" });
+    if (this.currentChatFile) {
+      this.paramsToggleBtn = this.headerEl.createEl("button", { cls: "chat-view-params-toggle" });
+      setIcon(this.paramsToggleBtn, "settings-2");
+      this.paramsToggleBtn.setAttribute("aria-label", "View & edit chat parameters");
+      this.paramsToggleBtn.onclick = () => {
+        const isHidden = this.paramsEl.style.display === "none";
+        this.paramsEl.style.display = isHidden ? "block" : "none";
+        this.paramsToggleBtn.toggleClass("is-active", isHidden);
+      };
+    }
   }
 
   private setButtonState(state: "idle" | "generating") {
@@ -153,34 +201,68 @@ export class ChatSideView extends ItemView {
     }
   }
 
+  async renderParameters() {
+    this.paramsEl.empty();
+    if (!this.currentChatFile) return;
+
+    const frontmatterService = this.serviceLocator.getFrontmatterService();
+    const settings = this.serviceLocator.getSettingsService().getSettings();
+    const frontmatter = await frontmatterService.getFrontmatter(this.currentChatFile, settings);
+
+    const debouncedUpdate = debounce(
+      async (key: string, value: any) => {
+        if (this.currentChatFile) {
+          await frontmatterService.updateFrontmatterField(this.currentChatFile, key, value);
+        }
+      },
+      500,
+      true
+    );
+
+    new Setting(this.paramsEl).setName("Model").addDropdown((dd) => {
+      this.commandRegistry.availableModels.forEach((model) => {
+        dd.addOption(model, model);
+      });
+      dd.setValue(frontmatter.model || DEFAULT_OPENAI_CONFIG.model);
+      dd.onChange((value) => debouncedUpdate("model", value));
+    });
+
+    new Setting(this.paramsEl)
+      .setName("System Prompt")
+      .setDesc("The instructions for the AI assistant.")
+      .addTextArea((text) => {
+        text.setValue(Array.isArray(frontmatter.system_commands) ? frontmatter.system_commands.join("\n") : "");
+        text.inputEl.rows = 5;
+        text.onChange((value) => {
+          const commands = value.split("\n").filter((cmd) => cmd.trim() !== "");
+          debouncedUpdate("system_commands", commands);
+        });
+      });
+
+    new Setting(this.paramsEl)
+      .setName("Temperature")
+      .setDesc("Controls randomness. Lower is more deterministic.")
+      .addSlider((slider) => {
+        slider
+          .setLimits(0, 2, 0.1)
+          .setValue(frontmatter.temperature ?? 1.0)
+          .setDynamicTooltip()
+          .onChange((value) => debouncedUpdate("temperature", value));
+      });
+  }
+
   async renderConversation() {
     if (this.isRendering && !this.isAwaitingResponse) return;
     this.isRendering = true;
 
     try {
-      if (!this.currentChatFile) {
-        this.messageContainer.empty();
-        this.messageContainer.createEl("p", {
-          text: "Open a chat note to see the conversation here.",
-          cls: "chat-view-placeholder",
-        });
-        this.textInput.disabled = true;
-        this.textInput.placeholder = "Open a chat note to start talking...";
-        this.currentMessagesCache = "[]";
-        return;
-      }
-
-      this.textInput.disabled = false;
-      this.textInput.placeholder = "Type your message...";
+      if (!this.currentChatFile) return;
 
       let fileContent: string;
       const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-      // If the current chat file is open in the active editor, use its content directly.
-      // This is the most reliable way to get the latest content during edits.
       if (activeView && activeView.file?.path === this.currentChatFile.path) {
         fileContent = activeView.editor.getValue();
       } else {
-        // Otherwise, read from the vault (for background updates).
         fileContent = await this.app.vault.read(this.currentChatFile);
       }
 
@@ -191,7 +273,7 @@ export class ChatSideView extends ItemView {
       const newMessagesCache = JSON.stringify(messagesWithRole);
 
       if (newMessagesCache === this.currentMessagesCache) {
-        // No change in messages, so don't re-render.
+        this.isRendering = false;
         return;
       }
 
@@ -225,17 +307,11 @@ export class ChatSideView extends ItemView {
     copyButton.addEventListener("click", () => {
       navigator.clipboard
         .writeText(message.content)
-        .then(() => {
-          new Notice("Copied to clipboard");
-        })
-        .catch((err) => {
-          console.error("Failed to copy message: ", err);
-          new Notice("Failed to copy message to clipboard");
-        });
+        .then(() => new Notice("Copied to clipboard"))
+        .catch((err) => new Notice("Failed to copy message to clipboard"));
     });
 
     const contentEl = messageEl.createDiv({ cls: "chat-message-content" });
-
     MarkdownRenderer.render(this.app, message.content, contentEl, this.currentChatFile?.path || "", this);
     this.scrollToBottom();
     return messageEl;
@@ -270,7 +346,6 @@ export class ChatSideView extends ItemView {
 
   private finalizeAssistantMessage(fullText: string) {
     if (!this.currentAssistantMessageEl) return;
-
     if (fullText.trim() === "") {
       this.currentAssistantMessageEl.remove();
     } else {
@@ -278,26 +353,20 @@ export class ChatSideView extends ItemView {
       if (contentEl) {
         contentEl.empty();
         MarkdownRenderer.render(this.app, fullText, contentEl as HTMLElement, this.currentChatFile?.path || "", this);
-        this.scrollToBottom();
       }
     }
     this.currentAssistantMessageEl = null;
     this.currentAssistantMessageContent = "";
+    this.scrollToBottom();
   }
 
   private async handleSendMessage() {
     const message = this.textInput.value.trim();
-    if (!message || this.isAwaitingResponse) return;
-
-    if (!this.currentChatFile) {
-      new Notice("No chat note is active to send a message to.");
-      return;
-    }
+    if (!message || this.isAwaitingResponse || !this.currentChatFile) return;
 
     this.textInput.value = "";
     this.setButtonState("generating");
 
-    // Optimistic UI update
     this.addMessageToView({ role: "user", content: message });
     this.startNewAssistantMessage();
 
@@ -308,12 +377,10 @@ export class ChatSideView extends ItemView {
       });
     } catch (err) {
       console.error("[ChatGPT MD] Error sending message from sidebar:", err);
-      this.finalizeAssistantMessage(""); // Clear the assistant bubble on error
-      new Notice("An error occurred while sending the message. Check the console for details.");
+      this.finalizeAssistantMessage("An error occurred. Please check the console for details.");
     } finally {
       this.setButtonState("idle");
       this.textInput.focus();
-      // Manually trigger a final update to sync the view with the file's ground truth.
       this.scheduleUpdate();
     }
   }

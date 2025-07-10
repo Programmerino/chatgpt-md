@@ -6,6 +6,64 @@
   background-color: var(--background-primary);
 }
 
+.chat-view-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--size-4-2) var(--size-4-3);
+  border-bottom: 1px solid var(--background-modifier-border);
+  flex-shrink: 0;
+}
+
+.chat-view-title {
+  font-weight: var(--font-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: var(--size-4-2);
+}
+
+.chat-view-params-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--size-2-1);
+  border-radius: var(--radius-s);
+  color: var(--icon-color);
+  flex-shrink: 0;
+}
+
+.chat-view-params-toggle:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--icon-color-hover);
+}
+
+.chat-view-params-toggle.is-active {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.chat-view-params {
+  padding: 0 var(--size-4-3);
+  border-bottom: 1px solid var(--background-modifier-border);
+  background-color: var(--background-secondary-alt);
+  flex-shrink: 0;
+}
+
+.chat-view-params .setting-item {
+  padding: var(--size-4-3) 0;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.chat-view-params .setting-item:first-child {
+  border-top: none;
+}
+
+.chat-view-params .setting-item-description {
+  font-size: var(--font-ui-smaller);
+  opacity: 0.8;
+}
+
 .chat-messages {
   flex-grow: 1;
   overflow-y: auto;
@@ -59,8 +117,6 @@
   margin-bottom: var(--size-4-2);
 }
 
-/* --- New Styles for Copy Button --- */
-
 .chat-message-actions {
   position: absolute;
   top: 4px;
@@ -98,8 +154,6 @@
   background-color: rgba(var(--mono-rgb-100), 0.2);
   opacity: 1;
 }
-
-/* --- End New Styles --- */
 
 .chat-input-container {
   padding: var(--size-4-2);
