@@ -12,34 +12,14 @@ import { Message } from "src/Models/Message";
  * Service responsible for editor operations
  */
 export class EditorService {
-  private fileService: FileService;
-  private editorContentService: EditorContentService;
-  private messageService: MessageService;
-  private templateService: TemplateService;
-  private frontmatterService: FrontmatterService;
-
   constructor(
     private app: App,
-    fileService?: FileService,
-    editorContentService?: EditorContentService,
-    messageService?: MessageService,
-    templateService?: TemplateService,
-    frontmatterService?: FrontmatterService
-  ) {
-    // Initialize services if not provided
-    this.fileService = fileService || new FileService(app);
-    this.editorContentService = editorContentService || new EditorContentService(app);
-    const notificationService = new NotificationService();
-    this.messageService = messageService || new MessageService(this.fileService, notificationService);
-
-    // FrontmatterService now requires FrontmatterManager, so it must be provided
-    if (!frontmatterService) {
-      throw new Error("FrontmatterService must be provided as it requires FrontmatterManager dependency");
-    }
-    this.frontmatterService = frontmatterService;
-
-    this.templateService = templateService || new TemplateService(app, this.fileService, this.editorContentService);
-  }
+    private fileService: FileService,
+    private editorContentService: EditorContentService,
+    private messageService: MessageService,
+    private templateService: TemplateService,
+    private frontmatterService: FrontmatterService
+  ) {}
 
   // FileService delegations
 

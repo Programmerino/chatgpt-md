@@ -58,12 +58,19 @@ export class ServiceLocator {
   private initializeServices(): void {
     // Initialize basic services
     this.notificationService = new NotificationService();
+    this.notificationService.setStatusBarItem(this.statusBarItem);
     this.errorService = new ErrorService(this.notificationService);
 
     // Initialize API services
-    this.apiService = new ApiService(this.errorService, this.notificationService);
     this.apiAuthService = new ApiAuthService(this.notificationService);
     this.apiResponseParser = new ApiResponseParser(this.notificationService);
+    this.apiService = new ApiService(
+      this.app,
+      this.errorService,
+      this.notificationService,
+      this.apiAuthService,
+      this.apiResponseParser
+    );
 
     // Initialize specialized services
     this.fileService = new FileService(this.app);

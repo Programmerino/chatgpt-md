@@ -1,4 +1,5 @@
 export const AI_SERVICE_OPENAI = "openai";
+export const DEBUG_MODEL_ID = "DEBUG";
 
 // API endpoints for each service
 export const API_ENDPOINTS = {
@@ -70,7 +71,6 @@ Key context:
 - Be concise but helpful, and format your responses appropriately for Markdown
 - If you provide code examples, use proper markdown code blocks with language specification
 - When suggesting organizational strategies, consider that this is within a personal knowledge management context
-- The user may be taking notes, brainstorming, writing, researching, or organizing information
 
 Code block formatting requirements:
 - Code blocks must start and end with exactly 3 backticks (\`\`\`) on a new line

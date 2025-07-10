@@ -9,15 +9,22 @@ import {
   ROLE_USER,
 } from "src/Constants";
 
-export const unfinishedCodeBlock = (txt: string): boolean => {
-  const codeBlockMatches = txt.match(/```/g) || [];
-  const isUnclosed = codeBlockMatches.length % 2 !== 0;
+/**
+ * Checks if a fenced code block is unclosed.
+ * @param text The text to check.
+ * @returns The fence string ('```' or '~~~') if unclosed, otherwise null.
+ */
+export const unfinishedCodeBlock = (text: string): string | null => {
+  // This regex finds ``` or ~~~ at the beginning of a line, ignoring any that are indented.
+  const fences = text.match(/^(?:```|~~~)/gm);
 
-  if (isUnclosed) {
-    console.log("[ChatGPT MD] Unclosed code block detected");
+  // If there are no fences or an even number, all blocks are closed.
+  if (!fences || fences.length % 2 === 0) {
+    return null;
   }
 
-  return isUnclosed;
+  // The last fence in the array is the one that's unclosed. Return its type.
+  return fences[fences.length - 1];
 };
 
 const cleanupRole = (role: string): string => {

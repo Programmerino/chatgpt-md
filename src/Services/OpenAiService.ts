@@ -1,4 +1,4 @@
-import { Editor } from "obsidian";
+import { App, Editor } from "obsidian";
 import { Message } from "src/Models/Message";
 import { AI_SERVICE_OPENAI, ROLE_SYSTEM } from "src/Constants";
 import { BaseAiService, IAiApiService, OpenAiModel, StreamCallbacks } from "./AiService";
@@ -18,7 +18,7 @@ export const DEFAULT_OPENAI_CONFIG: OpenAIConfig = {
   url: "https://api.openai.com",
 };
 
-export const fetchAvailableOpenAiModels = async (url: string, apiKey: string) => {
+export const fetchAvailableOpenAiModels = async (app: App, url: string, apiKey: string) => {
   try {
     const apiAuthService = new ApiAuthService();
 
@@ -27,7 +27,7 @@ export const fetchAvailableOpenAiModels = async (url: string, apiKey: string) =>
       return [];
     }
 
-    const apiService = new ApiService();
+    const apiService = new ApiService(app);
     const headers = apiAuthService.createAuthHeaders(apiKey, AI_SERVICE_OPENAI);
 
     const models = await apiService.makeGetRequest(`${url}/v1/models`, headers, AI_SERVICE_OPENAI);

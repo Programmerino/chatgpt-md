@@ -4,10 +4,18 @@ import { ApiService } from "./ApiService";
 import { ApiAuthService, isValidApiKey } from "./ApiAuthService";
 import { ApiResponseParser } from "./ApiResponseParser";
 import { EditorService } from "./EditorService";
-import { API_ENDPOINTS, NEWLINE, PLUGIN_SYSTEM_MESSAGE, ROLE_USER, AI_SERVICE_OPENAI } from "src/Constants";
+import {
+  API_ENDPOINTS,
+  NEWLINE,
+  PLUGIN_SYSTEM_MESSAGE,
+  ROLE_USER,
+  AI_SERVICE_OPENAI,
+  DEBUG_MODEL_ID,
+} from "src/Constants";
 import { ChatGPT_MDSettings } from "src/Models/Config";
 import { ErrorService } from "./ErrorService";
 import { NotificationService } from "./NotificationService";
+import { MockResponseModal } from "src/Views/MockResponseModal";
 
 export interface StreamCallbacks {
   onChunk: (chunk: string) => void;
@@ -34,7 +42,7 @@ export interface IAiApiService {
 
   inferTitle(
     view: MarkdownView,
-    settings: ChatGPT_MDSettings,
+    config: Record<string, any>,
     messages: string[],
     editorService: EditorService
   ): Promise<string>;
@@ -104,6 +112,22 @@ export abstract class BaseAiService implements IAiApiService {
   ): Promise<any> {
     const config = options;
 
+    if (config.model === DEBUG_MODEL_ID) {
+      return new Promise((resolve) => {
+        new MockResponseModal(
+          this.apiService.app,
+          "Mock LLM Response",
+          "Enter the response you want the AI to return.",
+          (response) => {
+            resolve({
+              fullString: response,
+              model: "DEBUG",
+            });
+          }
+        ).open();
+      });
+    }
+
     return options.stream
       ? this.callStreamingAPI(apiKey, messages, config, editor, headingPrefix, setAtCursor, settings, callbacks)
       : this.callNonStreamingAPI(apiKey, messages, config, settings);
@@ -121,17 +145,36 @@ export abstract class BaseAiService implements IAiApiService {
 
   async inferTitle(
     view: MarkdownView,
-    settings: ChatGPT_MDSettings,
+    config: Record<string, any>,
     messages: string[],
     editorService: EditorService
   ): Promise<string> {
+    if (config.model === DEBUG_MODEL_ID) {
+      return new Promise((resolve) => {
+        new MockResponseModal(
+          this.apiService.app,
+          "Mock Title Inference",
+          "Enter the title you want the AI to infer.",
+          async (title) => {
+            if (title && title.trim().length > 0) {
+              await editorService.writeInferredTitle(view, title.trim());
+              resolve(title.trim());
+            } else {
+              this.showNoTitleInferredNotification();
+              resolve("");
+            }
+          }
+        ).open();
+      });
+    }
+
     try {
       if (!view.file) {
         throw new Error("No active file found");
       }
-      const apiKey = this.getApiKeyFromSettings(settings);
+      const apiKey = this.getApiKeyFromSettings(config as ChatGPT_MDSettings);
 
-      const titleResponse = await this.inferTitleFromMessages(apiKey, messages, settings);
+      const titleResponse = await this.inferTitleFromMessages(apiKey, messages, config);
 
       let titleStr = "";
       if (typeof titleResponse === "string") {

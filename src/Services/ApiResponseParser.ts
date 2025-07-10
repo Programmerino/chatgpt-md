@@ -82,8 +82,10 @@ export class ApiResponseParser {
       }
     }
 
-    if (unfinishedCodeBlock(text)) {
-      const finalChunk = "\n```";
+    const openFence = unfinishedCodeBlock(text);
+    if (openFence) {
+      this.notificationService.showWarning("Unclosed code block detected. Appending closing fence.");
+      const finalChunk = `\n${openFence}`;
       text += finalChunk;
       if (editor && currentInsertPosition) {
         editor.replaceRange(finalChunk, currentInsertPosition);

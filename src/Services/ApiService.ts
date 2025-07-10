@@ -1,4 +1,4 @@
-import { Platform, requestUrl } from "obsidian";
+import { App, Platform, requestUrl } from "obsidian";
 import { ApiAuthService } from "./ApiAuthService";
 import { ApiResponseParser } from "./ApiResponseParser";
 import { ErrorService } from "./ErrorService";
@@ -16,6 +16,7 @@ export class ApiService {
   private apiResponseParser: ApiResponseParser;
 
   constructor(
+    public readonly app: App,
     errorService?: ErrorService,
     notificationService?: NotificationService,
     apiAuthService?: ApiAuthService,

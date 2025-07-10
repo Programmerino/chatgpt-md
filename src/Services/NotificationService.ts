@@ -4,6 +4,12 @@ import { Notice } from "obsidian";
  * Service for handling notifications and user feedback
  */
 export class NotificationService {
+  private statusBarItem: HTMLElement | null = null;
+
+  setStatusBarItem(item: HTMLElement) {
+    this.statusBarItem = item;
+  }
+
   /**
    * Show a notification to the user
    * @param message The message to display
@@ -14,15 +20,33 @@ export class NotificationService {
   }
 
   /**
-   * Format a message for display in the chat
-   * @param message The message to format
-   * @param isError Whether this is an error message
+   * Show a message in the status bar. It will be cleared automatically after the timeout.
+   * @param message The message to display.
+   * @param timeout The duration in milliseconds before clearing the message. 0 for persistent.
    */
-  formatChatMessage(message: string, isError: boolean = false): string {
-    if (isError) {
-      return `I am sorry. ${message}`;
+  showStatusBarMessage(message: string, timeout: number = 5000): void {
+    if (!this.statusBarItem) return;
+
+    this.statusBarItem.setText(`[ChatGPT MD] ${message}`);
+    this.statusBarItem.style.display = "";
+
+    if (timeout > 0) {
+      setTimeout(() => {
+        // Clear only if the message hasn't changed
+        if (this.statusBarItem?.getText() === `[ChatGPT MD] ${message}`) {
+          this.clearStatusBar();
+        }
+      }, timeout);
     }
-    return message;
+  }
+
+  /**
+   * Clears any message from the status bar.
+   */
+  clearStatusBar(): void {
+    if (!this.statusBarItem) return;
+    this.statusBarItem.setText("");
+    this.statusBarItem.style.display = "none";
   }
 
   /**

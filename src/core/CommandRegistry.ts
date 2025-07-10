@@ -34,8 +34,6 @@ export class CommandRegistry {
   private plugin: Plugin;
   private serviceLocator: ServiceLocator;
   private settingsService: SettingsService;
-  private aiService: IAiApiService | null = null;
-  private statusBarItemEl: HTMLElement;
   private apiAuthService: ApiAuthService;
   public availableModels: string[] = [];
   public isProcessingChat = false;
@@ -44,7 +42,6 @@ export class CommandRegistry {
     this.plugin = plugin;
     this.serviceLocator = serviceLocator;
     this.settingsService = settingsService;
-    this.statusBarItemEl = serviceLocator.getStatusBarItem();
     this.apiAuthService = serviceLocator.getApiAuthService();
 
     serviceLocator.setCommandRegistry(this);
@@ -84,21 +81,18 @@ export class CommandRegistry {
     }
 
     try {
-      this.updateStatusBar(`Inferring title...`);
-
       const aiServiceForTitle = this.serviceLocator.getAiApiService(frontmatter.aiService);
+      const titleInferenceConfig = { ...settings, ...frontmatter };
 
-      const titleInferenceSettings = { ...settings, ...frontmatter };
-
-      if (!titleInferenceSettings.model) {
+      if (!titleInferenceConfig.model) {
         console.warn("[ChatGPT MD] Model not specified for auto title inference. The service's default will be used.");
       }
-
-      await aiServiceForTitle.inferTitle(view, titleInferenceSettings, messages, editorService);
+      this.serviceLocator.getNotificationService().showStatusBarMessage("Inferring title...", 0);
+      await aiServiceForTitle.inferTitle(view, titleInferenceConfig, messages, editorService);
     } catch (error) {
       console.error("[ChatGPT MD] Auto title inference failed:", error);
     } finally {
-      this.updateStatusBar(``);
+      this.serviceLocator.getNotificationService().clearStatusBar();
     }
   }
 
@@ -263,31 +257,8 @@ export class CommandRegistry {
       name: "Infer title",
       icon: "subtitles",
       editorCallback: async (editor: Editor, view: MarkdownView) => {
-        if (!view.file) {
-          return;
-        }
-        const editorService = this.serviceLocator.getEditorService();
-        const settings = this.settingsService.getSettings();
-
-        const frontmatter = await editorService.getFrontmatter(view.file, settings);
-        this.aiService = this.serviceLocator.getAiApiService(AI_SERVICE_OPENAI);
-
-        if (!frontmatter.model) {
-          console.log("[ChatGPT MD] Model not set in frontmatter, using default model");
-          return;
-        }
-
-        this.updateStatusBar(`Calling ${frontmatter.model}`);
-        const { messages } = await editorService.getMessagesFromEditor(editor, settings);
-
-        const settingsWithApiKey = {
-          ...settings,
-          ...frontmatter,
-        };
-
-        await this.aiService.inferTitle(view, settingsWithApiKey, messages, editorService);
-
-        this.updateStatusBar("");
+        const chatService = this.serviceLocator.getChatService();
+        await chatService.inferTitle(editor, view);
       },
     });
   }
@@ -383,7 +354,7 @@ export class CommandRegistry {
 
     try {
       if (isValidApiKey(apiKey)) {
-        return await withTimeout(fetchAvailableOpenAiModels(url, apiKey), FETCH_MODELS_TIMEOUT_MS, []);
+        return await withTimeout(fetchAvailableOpenAiModels(this.plugin.app, url, apiKey), FETCH_MODELS_TIMEOUT_MS, []);
       }
       return [];
     } catch (error) {
@@ -391,12 +362,5 @@ export class CommandRegistry {
       console.error("Error fetching models:", error);
       return [];
     }
-  }
-
-  /**
-   * Update the status bar with the given text
-   */
-  private updateStatusBar(text: string) {
-    this.statusBarItemEl.setText(`[ChatGPT MD] ${text}`);
   }
 }

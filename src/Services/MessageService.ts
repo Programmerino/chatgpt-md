@@ -12,7 +12,7 @@ import {
   ROLE_USER,
   WIKI_LINKS_REGEX,
 } from "src/Constants";
-import { getHeadingPrefix, escapeRegExp } from "../Utilities/TextHelpers";
+import { getHeadingPrefix, escapeRegExp, unfinishedCodeBlock } from "../Utilities/TextHelpers";
 
 /**
  * Service responsible for all message-related operations
@@ -267,14 +267,6 @@ export class MessageService {
   }
 
   /**
-   * Check if a code block is unfinished
-   */
-  unfinishedCodeBlock(text: string): boolean {
-    const codeBlockMatches = text.match(/```/g);
-    return codeBlockMatches !== null && codeBlockMatches.length % 2 !== 0;
-  }
-
-  /**
    * Format a message for display
    */
   formatMessage(message: Message, headingLevel: number, model?: string): string {
@@ -329,7 +321,8 @@ export class MessageService {
   private processStandardResponse(editor: Editor, response: any, settings: ChatGPT_MDSettings): void {
     const responseStr = typeof response === "object" ? response.fullString || response : response;
     const model = typeof response === "object" ? response.model : undefined;
-    const formattedResponse = this.unfinishedCodeBlock(responseStr) ? responseStr + "\n```" : responseStr;
+    const openFence = unfinishedCodeBlock(responseStr);
+    const formattedResponse = openFence ? responseStr + `\n${openFence}` : responseStr;
     const headingPrefix = getHeadingPrefix(settings.headingLevel);
     const assistantHeader = this.getHeaderRole(headingPrefix, ROLE_ASSISTANT, model);
     const userHeader = this.getHeaderRole(headingPrefix, ROLE_USER);

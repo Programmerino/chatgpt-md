@@ -7,6 +7,7 @@ import { ApiAuthService } from "./ApiAuthService";
 import { MessageService } from "./MessageService";
 import { IAiApiService } from "./AiService";
 import { ChatGPT_MDSettings } from "src/Models/Config";
+import { EditorService } from "./EditorService";
 
 export interface StreamCallbacks {
   onChunk: (chunk: string) => void;
@@ -17,6 +18,7 @@ export class ChatService {
   private streaming = false;
   private apiAuthService: ApiAuthService;
   private messageService: MessageService;
+  private notificationService = this.serviceLocator.getNotificationService();
 
   constructor(
     private serviceLocator: ServiceLocator,
@@ -45,12 +47,14 @@ export class ChatService {
     const aiService = this.serviceLocator.getAiApiService(frontmatter.aiService);
     const headingPrefix = getHeadingPrefix(settings.headingLevel);
     const apiKeyToUse = this.apiAuthService.getApiKey(settings, frontmatter.aiService);
-    const statusBarItemEl = this.serviceLocator.getStatusBarItem();
 
     if (Platform.isMobile) {
       new Notice(`[ChatGPT MD] Calling ${frontmatter.model}`);
     } else {
-      statusBarItemEl.setText(`Calling ${frontmatter.model}... (use 'Stop AI Generation' to cancel)`);
+      this.notificationService.showStatusBarMessage(
+        `Calling ${frontmatter.model}... (use 'Stop AI Generation' to cancel)`,
+        0
+      );
     }
 
     try {
@@ -65,7 +69,7 @@ export class ChatService {
         callbacks
       );
     } finally {
-      statusBarItemEl.setText("");
+      this.notificationService.clearStatusBar();
     }
   }
 
@@ -106,6 +110,35 @@ export class ChatService {
       }
     } finally {
       this.streaming = false;
+    }
+  }
+
+  public async inferTitle(editor: Editor, view: MarkdownView): Promise<void> {
+    if (!view.file) {
+      this.notificationService.showError("Cannot infer title without an active file.");
+      return;
+    }
+    const editorService = this.serviceLocator.getEditorService();
+    const settings = this.settingsService.getSettings();
+    const frontmatter = await editorService.getFrontmatter(view.file, settings);
+    const aiService = this.serviceLocator.getAiApiService(frontmatter.aiService);
+
+    if (!frontmatter.model) {
+      this.notificationService.showWarning("Model not set in frontmatter, using default.");
+      frontmatter.model = this.settingsService.getSettings().defaultChatFrontmatter;
+    }
+
+    this.notificationService.showStatusBarMessage(`Inferring title with ${frontmatter.model}...`, 0);
+
+    try {
+      const { messages } = await editorService.getMessagesFromEditor(editor, settings);
+      const configForTitleInference = { ...settings, ...frontmatter };
+      await aiService.inferTitle(view, configForTitleInference, messages, editorService);
+    } catch (error) {
+      this.notificationService.showError("Failed to infer title. Check the console for details.");
+      console.error("[ChatGPT MD] Title inference error:", error);
+    } finally {
+      this.notificationService.clearStatusBar();
     }
   }
 
