@@ -165,9 +165,9 @@ export abstract class BaseAiService implements IAiApiService {
 
   protected inferTitleFromMessages = async (apiKey: string, messages: string[], settings: any): Promise<string> => {
     try {
-      const prompt = `Infer title from the summary of the content of these messages. The title **cannot** contain any of the following characters: colon (:), back slash (\\), forward slash (/), asterisk (*), question mark (?), double quote ("), less than (<), greater than (>), or pipe (|) as these are invalid in file names. Just return the title. Write the title in ${
+      const prompt = `Infer a concise, suitable filename for the following chat conversation. Return only the title, without any additional text or quotes. The title should be in ${
         settings.inferTitleLanguage
-      }. \nMessages:${NEWLINE}${JSON.stringify(messages)}`;
+      }. Messages:\n\n${JSON.stringify(messages)}`;
 
       const defaultConfig = this.getDefaultConfig();
       const config = { ...defaultConfig, ...settings };

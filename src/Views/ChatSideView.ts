@@ -179,6 +179,26 @@ export class ChatSideView extends ItemView {
     const messageEl = this.messageContainer.createDiv({
       cls: `chat-message ${message.role}`,
     });
+
+    const messageActions = messageEl.createDiv({ cls: "chat-message-actions" });
+    const copyButton = messageActions.createEl("button", {
+      cls: "chat-message-copy-button",
+    });
+    setIcon(copyButton, "copy");
+    copyButton.setAttribute("aria-label", "Copy message");
+
+    copyButton.addEventListener("click", () => {
+      navigator.clipboard
+        .writeText(message.content)
+        .then(() => {
+          new Notice("Copied to clipboard");
+        })
+        .catch((err) => {
+          console.error("Failed to copy message: ", err);
+          new Notice("Failed to copy message to clipboard");
+        });
+    });
+
     const contentEl = messageEl.createDiv({ cls: "chat-message-content" });
 
     MarkdownRenderer.render(this.app, message.content, contentEl, this.currentChatFile?.path || "", this);

@@ -5,6 +5,8 @@ import { getHeadingPrefix } from "../Utilities/TextHelpers";
 import { ROLE_ASSISTANT, ROLE_USER } from "src/Constants";
 import { ApiAuthService } from "./ApiAuthService";
 import { MessageService } from "./MessageService";
+import { IAiApiService } from "./AiService";
+import { ChatGPT_MDSettings } from "src/Models/Config";
 
 export interface StreamCallbacks {
   onChunk: (chunk: string) => void;
@@ -28,14 +30,47 @@ export class ChatService {
     return this.streaming;
   }
 
-  public async processChat(editor: Editor, view: MarkdownView, callbacks?: StreamCallbacks): Promise<void> {
+  private async _callAndProcessAI(
+    file: TFile,
+    messagesWithRole: any[],
+    frontmatter: any,
+    settings: ChatGPT_MDSettings,
+    editor?: Editor, // For direct streaming
+    callbacks?: StreamCallbacks // For sidebar UI
+  ) {
+    const aiService = this.serviceLocator.getAiApiService(frontmatter.aiService);
+    const headingPrefix = getHeadingPrefix(settings.headingLevel);
+    const apiKeyToUse = this.apiAuthService.getApiKey(settings, frontmatter.aiService);
+    const statusBarItemEl = this.serviceLocator.getStatusBarItem();
+
+    if (Platform.isMobile) {
+      new Notice(`[ChatGPT MD] Calling ${frontmatter.model}`);
+    } else {
+      statusBarItemEl.setText(`Calling ${frontmatter.model}... (use 'Stop AI Generation' to cancel)`);
+    }
+
+    try {
+      return await aiService.callAIAPI(
+        messagesWithRole,
+        frontmatter,
+        headingPrefix,
+        editor,
+        editor ? settings.generateAtCursor : false,
+        apiKeyToUse,
+        settings,
+        callbacks
+      );
+    } finally {
+      statusBarItemEl.setText("");
+    }
+  }
+
+  public async processChat(editor: Editor, view: MarkdownView): Promise<void> {
     if (this.streaming) {
       new Notice("A chat is already in progress.");
       return;
     }
-
     this.streaming = true;
-    const statusBarItemEl = this.serviceLocator.getStatusBarItem();
 
     try {
       if (!view.file) return;
@@ -43,41 +78,20 @@ export class ChatService {
       const editorService = this.serviceLocator.getEditorService();
       const settings = this.settingsService.getSettings();
       const frontmatter = await editorService.getFrontmatter(view.file, settings);
-      const aiService = this.serviceLocator.getAiApiService(frontmatter.aiService);
-
       const { messagesWithRole, messages } = await editorService.getMessagesFromEditor(editor, settings);
 
-      if (!settings.generateAtCursor && !callbacks) {
+      if (!settings.generateAtCursor) {
         editorService.moveCursorToEnd(editor);
       }
 
-      if (Platform.isMobile) {
-        new Notice(`[ChatGPT MD] Calling ${frontmatter.model}`);
-      } else {
-        statusBarItemEl.setText(`Calling ${frontmatter.model}... (use 'Stop AI Generation' to cancel)`);
-      }
-
-      const apiKeyToUse = this.apiAuthService.getApiKey(settings, frontmatter.aiService);
-
-      const response = await aiService.callAIAPI(
-        messagesWithRole,
-        frontmatter,
-        getHeadingPrefix(settings.headingLevel),
-        editor,
-        settings.generateAtCursor,
-        apiKeyToUse,
-        settings,
-        callbacks
-      );
+      const response = await this._callAndProcessAI(view.file, messagesWithRole, frontmatter, settings, editor);
 
       // This is for editor-initiated chats. The full response is already streamed in.
       // We just need to add the next user prompt.
-      if (!callbacks) {
-        editorService.processResponse(editor, response, settings);
-      }
+      editorService.processResponse(editor, response, settings);
 
       if (response && !response.wasAborted) {
-        const updatedContent = await this.serviceLocator.getApp().vault.read(view.file);
+        const updatedContent = editor.getValue();
         const { messages: updatedMessages } = await editorService.getMessagesFromFileContent(updatedContent, settings);
         await this.serviceLocator.getCommandRegistry().handleAutoTitleInference(view, frontmatter, updatedMessages);
       }
@@ -88,59 +102,47 @@ export class ChatService {
       }
     } finally {
       this.streaming = false;
-      statusBarItemEl.setText("");
     }
   }
 
   public async sendMessageFromSidebar(message: string, file: TFile, callbacks: StreamCallbacks) {
-    const editorService = this.serviceLocator.getEditorService();
-    const settings = this.settingsService.getSettings();
-    const vault = this.serviceLocator.getApp().vault;
-    const headingPrefix = getHeadingPrefix(settings.headingLevel);
-
-    // 1. Append user message directly to the file
-    const userHeader = this.messageService.getHeaderRole(headingPrefix, ROLE_USER);
-    await vault.append(file, `${userHeader}${message}`);
-
-    // 2. Process the chat
     if (this.streaming) {
       new Notice("A chat is already in progress.");
       return;
     }
-
     this.streaming = true;
-    const statusBarItemEl = this.serviceLocator.getStatusBarItem();
+
+    const editorService = this.serviceLocator.getEditorService();
+    const settings = this.settingsService.getSettings();
+    const vault = this.serviceLocator.getApp().vault;
 
     try {
+      // 1. Append user message directly to the file
+      const userHeader = this.messageService.getHeaderRole(getHeadingPrefix(settings.headingLevel), ROLE_USER);
+      await vault.append(file, `${userHeader}${message}`);
+
+      // 2. Prepare for AI call
       const frontmatter = await editorService.getFrontmatter(file, settings);
-      const aiService = this.serviceLocator.getAiApiService(frontmatter.aiService);
       const fileContent = await vault.read(file);
       const { messagesWithRole } = await editorService.getMessagesFromFileContent(fileContent, settings);
 
-      if (Platform.isMobile) {
-        new Notice(`[ChatGPT MD] Calling ${frontmatter.model}`);
-      } else {
-        statusBarItemEl.setText(`Calling ${frontmatter.model}... (use 'Stop AI Generation' to cancel)`);
-      }
-
-      const apiKeyToUse = this.apiAuthService.getApiKey(settings, frontmatter.aiService);
-
-      // Call AI service with callbacks for UI, but NO editor for direct streaming.
-      const response = await aiService.callAIAPI(
+      // 3. Call AI, passing callbacks for UI updates
+      const response = await this._callAndProcessAI(
+        file,
         messagesWithRole,
         frontmatter,
-        headingPrefix,
-        undefined, // No editor for direct streaming
-        false,
-        apiKeyToUse,
         settings,
+        undefined,
         callbacks
       );
 
-      // Append the full response to the editor now that streaming is complete.
+      // 4. Append the full response to the file now that streaming is complete.
       if (response && !response.wasAborted) {
-        const assistantHeader = this.messageService.getHeaderRole(headingPrefix, ROLE_ASSISTANT, frontmatter.model);
-
+        const assistantHeader = this.messageService.getHeaderRole(
+          getHeadingPrefix(settings.headingLevel),
+          ROLE_ASSISTANT,
+          frontmatter.model
+        );
         const fullResponseText = `${assistantHeader}${response.fullString}`;
         await vault.append(file, fullResponseText);
 
@@ -163,7 +165,6 @@ export class ChatService {
       }
     } finally {
       this.streaming = false;
-      statusBarItemEl.setText("");
     }
   }
 }
