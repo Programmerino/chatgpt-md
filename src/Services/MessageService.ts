@@ -174,43 +174,55 @@ export class MessageService {
     messages: string[];
     messagesWithRole: Message[];
   }> {
-    let messages = this.cleanMessagesFromNote(editor);
+    // 1. Get raw message strings from the editor, split by horizontal rules.
+    const rawMessages = this.cleanMessagesFromNote(editor);
 
-    messages = await Promise.all(
-      messages.map(async (message) => {
-        const links = this.findLinksInMessage(message);
+    // 2. For each raw message, extract its role and content.
+    // At this point, content still contains wikilinks like `[[...]]`.
+    let messagesWithRole: Message[] = rawMessages.map((msg) => this.extractRoleAndMessage(msg));
+
+    // 3. Asynchronously process each message to resolve and inline wikilinks.
+    messagesWithRole = await Promise.all(
+      messagesWithRole.map(async (message) => {
+        // Find all links in the current message's content.
+        const links = this.findLinksInMessage(message.content);
+        let updatedContent = message.content;
+
+        // Iterate over found links and replace them with the content of the linked note.
         for (const link of links) {
           try {
-            let content = await this.fileService.getLinkedNoteContent(link.title);
+            const linkedNoteContent = await this.fileService.getLinkedNoteContent(link.title);
 
-            if (content) {
-              // remove the assistant and user delimiters
-              // if the inlined note was already a chat
-              const regex = new RegExp(
-                `${NEWLINE}${HORIZONTAL_LINE_MD}${NEWLINE}#+ ${ROLE_IDENTIFIER}(?:${ROLE_USER}|${ROLE_ASSISTANT}).*$`,
-                "gm"
-              );
-              content = content?.replace(regex, "");
-              content = this.removeYAMLFrontMatter(content) || null;
+            if (linkedNoteContent) {
+              // The content of the linked note is processed to remove its own frontmatter.
+              // It is then treated as plain text and injected.
+              const processedContent = this.removeYAMLFrontMatter(linkedNoteContent);
 
-              message = message.replace(
-                new RegExp(this.escapeRegExp(link.link), "g"),
-                `${NEWLINE}${link.title}${NEWLINE}${content}${NEWLINE}`
-              );
+              if (processedContent) {
+                // Replace the wikilink placeholder with the actual content.
+                updatedContent = updatedContent.replace(
+                  new RegExp(this.escapeRegExp(link.link), "g"),
+                  `${NEWLINE}${link.title}${NEWLINE}${processedContent}${NEWLINE}`
+                );
+              }
             } else {
-              console.warn(`Error fetching linked note content for: ${link.link}`);
+              console.warn(`Could not fetch linked note content for: ${link.link}`);
             }
           } catch (error) {
             console.error(error);
           }
         }
 
-        return message;
+        // Return a new message object with the updated content.
+        return {
+          ...message,
+          content: updatedContent,
+        };
       })
     );
 
-    // Extract roles from each message
-    const messagesWithRole = messages.map((msg) => this.extractRoleAndMessage(msg));
+    // Reconstruct the `messages` string array for backward compatibility (e.g., for title inference).
+    const messages = messagesWithRole.map((m) => m.content);
 
     return { messages, messagesWithRole };
   }

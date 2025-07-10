@@ -105,11 +105,6 @@ export abstract class BaseAiService implements IAiApiService {
   abstract createPayload(config: Record<string, any>, messages: Message[]): Record<string, any>;
 
   /**
-   * Handle API errors
-   */
-  abstract handleAPIError(err: unknown, config: Record<string, any>, prefix: string): never;
-
-  /**
    * Call the AI API with the given parameters
    */
   async callAIAPI(

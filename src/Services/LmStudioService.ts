@@ -120,28 +120,6 @@ export class LmStudioService extends BaseAiService implements IAiApiService {
     return payload;
   }
 
-  handleAPIError(err: any, config: LmStudioConfig, prefix: string): never {
-    // Use the new ErrorService to handle errors
-    const context = {
-      model: config.model,
-      url: config.url,
-      defaultUrl: DEFAULT_LMSTUDIO_CONFIG.url,
-      aiService: AI_SERVICE_LMSTUDIO,
-    };
-
-    // Special handling for custom URL errors
-    if (err instanceof Object && config.url !== DEFAULT_LMSTUDIO_CONFIG.url) {
-      return this.errorService.handleUrlError(config.url, DEFAULT_LMSTUDIO_CONFIG.url, AI_SERVICE_LMSTUDIO) as never;
-    }
-
-    // Use the centralized error handling
-    return this.errorService.handleApiError(err, AI_SERVICE_LMSTUDIO, {
-      context,
-      showNotification: true,
-      logToConsole: true,
-    }) as never;
-  }
-
   protected async callStreamingAPI(
     apiKey: string | undefined,
     messages: Message[],

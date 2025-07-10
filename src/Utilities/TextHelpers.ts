@@ -1,3 +1,4 @@
+import { parseYaml } from "obsidian";
 import {
   HORIZONTAL_LINE_MD,
   MAX_HEADING_LEVEL,
@@ -96,97 +97,28 @@ export const getHeaderRole = (headingPrefix: string, role: string, model?: strin
   `${NEWLINE}${HORIZONTAL_LINE_MD}${NEWLINE}${headingPrefix}${ROLE_IDENTIFIER}${role}${model ? `<span style="font-size: small;"> (${model})</span>` : ``}${NEWLINE}`;
 
 export const parseSettingsFrontmatter = (yamlString: string): Record<string, any> => {
-  // Remove the --- markers and split into lines
-  const content = yamlString.replace(/^---\n/, "").replace(/\n---$/, "");
-  const lines = content.split("\n");
-  const result: Record<string, any> = {};
+  if (!yamlString) {
+    return {};
+  }
+  // Remove the --- markers and trim whitespace
+  const content = yamlString
+    .replace(/^---\s*\n?/, "")
+    .replace(/\n?---\s*$/, "")
+    .trim();
 
-  // Track multi-line array state
-  let currentArrayKey: string | null = null;
-  let currentArray: string[] = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-
-    // Skip empty lines
-    if (!line) continue;
-
-    // Check if we're inside a multi-line array
-    if (currentArrayKey !== null) {
-      // Check if this line is an array item (starts with a dash)
-      if (line.startsWith("-")) {
-        // Extract the value after the dash
-        let itemValue = line.substring(1).trim();
-
-        // Remove quotes if they exist
-        if (
-          (itemValue.startsWith("'") && itemValue.endsWith("'")) ||
-          (itemValue.startsWith('"') && itemValue.endsWith('"'))
-        ) {
-          itemValue = itemValue.substring(1, itemValue.length - 1);
-        }
-
-        currentArray.push(itemValue);
-        continue;
-      } else {
-        // End of array - store it in the result
-        result[currentArrayKey] = currentArray;
-        currentArrayKey = null;
-        currentArray = [];
-        // Don't continue - process this line normally
-      }
-    }
-
-    // Split on first colon (but not if it's in quotes)
-    const colonIndex = line.indexOf(":");
-    if (colonIndex === -1) continue; // Skip invalid lines
-
-    const key = line.substring(0, colonIndex).trim();
-    const value = line.substring(colonIndex + 1).trim();
-
-    // Check for multi-line array start
-    if (value === "" && i + 1 < lines.length && lines[i + 1].trim().startsWith("-")) {
-      currentArrayKey = key;
-      currentArray = [];
-      continue;
-    }
-
-    // Parse the value
-    if (value.startsWith("[") && value.endsWith("]")) {
-      // Handle inline arrays
-      result[key] = value
-        .slice(1, -1)
-        .split(",")
-        .map((item) => {
-          const trimmed = item.trim();
-          // Handle quoted strings in arrays
-          if (
-            (trimmed.startsWith("'") && trimmed.endsWith("'")) ||
-            (trimmed.startsWith('"') && trimmed.endsWith('"'))
-          ) {
-            return trimmed.slice(1, -1);
-          }
-          return trimmed;
-        });
-    } else if (value === "true") {
-      result[key] = true;
-    } else if (value === "false") {
-      result[key] = false;
-    } else if (value === "null") {
-      result[key] = null;
-    } else if (!isNaN(Number(value))) {
-      result[key] = Number(value);
-    } else {
-      result[key] = value;
-    }
+  // If content is empty after trimming, return empty object
+  if (!content) {
+    return {};
   }
 
-  // Handle case where file ends with an array
-  if (currentArrayKey !== null) {
-    result[currentArrayKey] = currentArray;
+  try {
+    const parsed = parseYaml(content);
+    // Ensure we return an object, even if parsing results in null/undefined/etc.
+    return typeof parsed === "object" && parsed !== null ? parsed : {};
+  } catch (e) {
+    console.error("Error parsing YAML frontmatter from settings:", e);
+    return {};
   }
-
-  return result;
 };
 
 export const escapeRegExp = (string: string): string => {

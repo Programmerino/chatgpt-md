@@ -108,28 +108,6 @@ export class OllamaService extends BaseAiService implements IAiApiService {
     };
   }
 
-  handleAPIError(err: any, config: OllamaConfig, prefix: string): never {
-    // Use the new ErrorService to handle errors
-    const context = {
-      model: config.model,
-      url: config.url,
-      defaultUrl: DEFAULT_OLLAMA_CONFIG.url,
-      aiService: AI_SERVICE_OLLAMA,
-    };
-
-    // Special handling for custom URL errors
-    if (err instanceof Object && config.url !== DEFAULT_OLLAMA_CONFIG.url) {
-      return this.errorService.handleUrlError(config.url, DEFAULT_OLLAMA_CONFIG.url, AI_SERVICE_OLLAMA) as never;
-    }
-
-    // Use the centralized error handling
-    return this.errorService.handleApiError(err, AI_SERVICE_OLLAMA, {
-      context,
-      showNotification: true,
-      logToConsole: true,
-    }) as never;
-  }
-
   protected async callStreamingAPI(
     apiKey: string | undefined,
     messages: Message[],
