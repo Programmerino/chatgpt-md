@@ -137,6 +137,7 @@ export class CommandRegistry {
               type: CHAT_SIDE_VIEW_TYPE,
               active: true,
             });
+            workspace.revealLeaf(leaf);
           }
         }
       },
@@ -153,21 +154,13 @@ export class CommandRegistry {
       icon: "list",
       editorCallback: async (editor: Editor, view: MarkdownView) => {
         const editorService = this.serviceLocator.getEditorService();
-        const settings = this.settingsService.getSettings();
 
         const initialModal = new AiModelSuggestModal(this.plugin.app, view, editorService, this.availableModels);
         initialModal.open();
 
         (async () => {
           try {
-            const frontmatter = await editorService.getFrontmatter(view, settings);
-            const openAiKey = this.apiAuthService.getApiKey(settings, AI_SERVICE_OPENAI);
-
-            const currentUrls = {
-              [AI_SERVICE_OPENAI]: frontmatter.openaiUrl || settings.openaiUrl || DEFAULT_OPENAI_CONFIG.url,
-            };
-
-            const freshModels = await this.fetchAvailableModels(currentUrls, openAiKey);
+            const freshModels = await this.fetchAvailableModels();
 
             const currentModelsSet = new Set(this.availableModels);
             const freshModelsSet = new Set(freshModels);
@@ -207,7 +200,7 @@ export class CommandRegistry {
         const settings = this.settingsService.getSettings();
 
         try {
-          const frontmatter = await editorService.getFrontmatter(view, settings);
+          const frontmatter = await editorService.getFrontmatter(view.file, settings);
           const aiService = this.serviceLocator.getAiApiService(AI_SERVICE_OPENAI);
 
           const { messagesWithRole } = await editorService.getMessagesFromEditor(editor, settings);
@@ -292,10 +285,13 @@ export class CommandRegistry {
       name: "Infer title",
       icon: "subtitles",
       editorCallback: async (editor: Editor, view: MarkdownView) => {
+        if (!view.file) {
+          return;
+        }
         const editorService = this.serviceLocator.getEditorService();
         const settings = this.settingsService.getSettings();
 
-        const frontmatter = await editorService.getFrontmatter(view, settings);
+        const frontmatter = await editorService.getFrontmatter(view.file, settings);
         this.aiService = this.serviceLocator.getAiApiService(AI_SERVICE_OPENAI);
 
         if (!frontmatter.model) {
@@ -387,14 +383,7 @@ export class CommandRegistry {
   public async initializeAvailableModels(): Promise<void> {
     console.log("[ChatGPT MD] Initializing available models...");
     try {
-      const settings = this.settingsService.getSettings();
-      const openAiKey = this.apiAuthService.getApiKey(settings, AI_SERVICE_OPENAI);
-
-      const defaultUrls = {
-        [AI_SERVICE_OPENAI]: settings.openaiUrl || DEFAULT_OPENAI_CONFIG.url,
-      };
-
-      this.availableModels = await this.fetchAvailableModels(defaultUrls, openAiKey);
+      this.availableModels = await this.fetchAvailableModels();
       console.log(`[ChatGPT MD] Found ${this.availableModels.length} available models.`);
     } catch (error) {
       console.error("[ChatGPT MD] Error initializing available models:", error);
@@ -403,24 +392,22 @@ export class CommandRegistry {
   }
 
   /**
-   * Fetch available models from all services
+   * Fetch available models from OpenAI
    */
-  public async fetchAvailableModels(urls: { [key: string]: string }, apiKey: string): Promise<string[]> {
+  public async fetchAvailableModels(): Promise<string[]> {
+    const settings = this.settingsService.getSettings();
+    const apiKey = this.apiAuthService.getApiKey(settings, AI_SERVICE_OPENAI);
+    const url = settings.openaiUrl || DEFAULT_OPENAI_CONFIG.url;
+
     function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
       return Promise.race([promise, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
     }
 
     try {
-      const promises: Promise<string[]>[] = [];
-
       if (isValidApiKey(apiKey)) {
-        promises.push(
-          withTimeout(fetchAvailableOpenAiModels(urls[AI_SERVICE_OPENAI], apiKey), FETCH_MODELS_TIMEOUT_MS, [])
-        );
+        return await withTimeout(fetchAvailableOpenAiModels(url, apiKey), FETCH_MODELS_TIMEOUT_MS, []);
       }
-
-      const results = await Promise.all(promises);
-      return results.flat();
+      return [];
     } catch (error) {
       new Notice("Error fetching models: " + (error as Error).message);
       console.error("Error fetching models:", error);

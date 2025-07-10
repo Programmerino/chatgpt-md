@@ -5,9 +5,6 @@ import { BaseAiService, IAiApiService, OpenAiModel, StreamCallbacks } from "./Ai
 import { ChatGPT_MDSettings } from "src/Models/Config";
 import { ApiService } from "./ApiService";
 import { ApiAuthService, isValidApiKey } from "./ApiAuthService";
-import { ApiResponseParser } from "./ApiResponseParser";
-import { ErrorService } from "./ErrorService";
-import { NotificationService } from "./NotificationService";
 
 export const DEFAULT_OPENAI_CONFIG: OpenAIConfig = {
   aiService: AI_SERVICE_OPENAI,
@@ -100,7 +97,7 @@ export class OpenAiService extends BaseAiService implements IAiApiService {
     apiKey: string | undefined,
     messages: Message[],
     config: OpenAIConfig,
-    editor: Editor,
+    editor: Editor | undefined,
     headingPrefix: string,
     setAtCursor?: boolean | undefined,
     settings?: ChatGPT_MDSettings,

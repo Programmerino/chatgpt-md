@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, MarkdownView, Notice, setIcon, MarkdownRenderer } from "obsidian";
+import { ItemView, WorkspaceLeaf, MarkdownView, Notice, setIcon, MarkdownRenderer, TFile, debounce } from "obsidian";
 import { ServiceLocator } from "../core/ServiceLocator";
 import { Message } from "../Models/Message";
 import { ChatService } from "src/Services/ChatService";
@@ -15,6 +15,7 @@ export class ChatSideView extends ItemView {
   private isRendering = false;
   private currentAssistantMessageEl: HTMLElement | null = null;
   private currentAssistantMessageContent = "";
+  private currentChatFile: TFile | null = null;
 
   constructor(leaf: WorkspaceLeaf, serviceLocator: ServiceLocator) {
     super(leaf);
@@ -58,8 +59,20 @@ export class ChatSideView extends ItemView {
       }
     });
 
-    this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.renderConversation()));
-    this.registerEvent(this.app.workspace.on("editor-change", () => this.renderConversation()));
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", (leaf) => {
+        if (leaf?.view instanceof MarkdownView && leaf.view.file) {
+          this.currentChatFile = leaf.view.file;
+          this.renderConversation();
+        }
+      })
+    );
+    this.registerEvent(
+      this.app.workspace.on(
+        "editor-change",
+        debounce(() => this.renderConversation(), 500, true)
+      )
+    );
 
     this.renderConversation();
   }
@@ -74,9 +87,13 @@ export class ChatSideView extends ItemView {
 
     try {
       const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+      if (activeView && activeView.file) {
+        this.currentChatFile = activeView.file;
+      }
+
       this.messageContainer.empty();
 
-      if (!activeView) {
+      if (!this.currentChatFile) {
         this.messageContainer.createEl("p", {
           text: "Open a chat note to see the conversation here.",
           cls: "chat-view-placeholder",
@@ -86,11 +103,13 @@ export class ChatSideView extends ItemView {
       }
 
       this.textInput.disabled = false;
-      const editor = activeView.editor;
+      const fileContent = await this.app.vault.cachedRead(this.currentChatFile);
+      const editorService = this.serviceLocator.getEditorService();
       const settings = this.serviceLocator.getSettingsService().getSettings();
-      const { messagesWithRole } = await this.serviceLocator.getEditorService().getMessagesFromEditor(editor, settings);
+      const { messagesWithRole } = await editorService.getMessagesFromFileContent(fileContent, settings);
 
       for (const message of messagesWithRole) {
+        if (message.content.trim() === "") continue;
         this.addMessageToView(message);
       }
     } catch (error) {
@@ -135,7 +154,8 @@ export class ChatSideView extends ItemView {
     }
   }
 
-  private finalizeAssistantMessage() {
+  private finalizeAssistantMessage(fullText: string) {
+    this.currentAssistantMessageContent = fullText;
     if (this.currentAssistantMessageEl) {
       const contentEl = this.currentAssistantMessageEl.querySelector(".chat-message-content");
       if (contentEl) {
@@ -152,13 +172,18 @@ export class ChatSideView extends ItemView {
     const message = this.textInput.value.trim();
     if (!message || this.chatService.isStreaming()) return;
 
+    if (!this.currentChatFile) {
+      new Notice("No chat note is active to send a message to.");
+      return;
+    }
+
     this.textInput.value = "";
     this.addMessageToView({ role: "user", content: message });
     this.startNewAssistantMessage();
 
-    await this.chatService.sendMessageFromSidebar(message, {
+    await this.chatService.sendMessageFromSidebar(message, this.currentChatFile, {
       onChunk: (chunk: string) => this.appendChunkToView(chunk),
-      onDone: () => this.finalizeAssistantMessage(),
+      onDone: (fullText) => this.finalizeAssistantMessage(fullText),
     });
   }
 

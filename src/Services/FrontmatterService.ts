@@ -11,11 +11,11 @@ export class FrontmatterService {
     private frontmatterManager: FrontmatterManager
   ) {}
 
-  async getFrontmatter(view: MarkdownView, settings: ChatGPT_MDSettings): Promise<any> {
+  async getFrontmatter(file: TFile | null, settings: ChatGPT_MDSettings): Promise<any> {
     let frontmatter: Record<string, any> = {};
 
-    if (view.file) {
-      const fileFrontmatter = await this.frontmatterManager.readFrontmatter(view.file);
+    if (file) {
+      const fileFrontmatter = await this.frontmatterManager.readFrontmatter(file);
       if (fileFrontmatter) {
         frontmatter = { ...fileFrontmatter };
       }

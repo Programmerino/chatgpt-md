@@ -60,9 +60,6 @@ export abstract class BaseAiService implements IAiApiService {
   protected readonly errorService: ErrorService;
   protected readonly notificationService: NotificationService;
 
-  protected abstract serviceType: string;
-  protected abstract getSystemMessageRole(): string;
-
   constructor(errorService?: ErrorService, notificationService?: NotificationService) {
     this.notificationService = notificationService ?? new NotificationService();
     this.errorService = errorService ?? new ErrorService(this.notificationService);
@@ -71,9 +68,30 @@ export abstract class BaseAiService implements IAiApiService {
     this.apiResponseParser = new ApiResponseParser(this.notificationService);
   }
 
+  // --- ABSTRACT MEMBERS ---
+  protected abstract serviceType: string;
   abstract getDefaultConfig(): Record<string, any>;
   abstract createPayload(config: Record<string, any>, messages: Message[]): Record<string, any>;
+  abstract getApiKeyFromSettings(settings: ChatGPT_MDSettings): string;
+  protected abstract getSystemMessageRole(): string;
+  protected abstract callStreamingAPI(
+    apiKey: string | undefined,
+    messages: Message[],
+    config: Record<string, any>,
+    editor: Editor | undefined,
+    headingPrefix: string,
+    setAtCursor?: boolean,
+    settings?: ChatGPT_MDSettings,
+    callbacks?: StreamCallbacks
+  ): Promise<StreamingResponse>;
+  protected abstract callNonStreamingAPI(
+    apiKey: string | undefined,
+    messages: Message[],
+    config: Record<string, any>,
+    settings?: ChatGPT_MDSettings
+  ): Promise<any>;
 
+  // --- CONCRETE METHODS ---
   async callAIAPI(
     messages: Message[],
     options: Record<string, any> = {},
@@ -86,7 +104,7 @@ export abstract class BaseAiService implements IAiApiService {
   ): Promise<any> {
     const config = options;
 
-    return options.stream && editor
+    return options.stream
       ? this.callStreamingAPI(apiKey, messages, config, editor, headingPrefix, setAtCursor, settings, callbacks)
       : this.callNonStreamingAPI(apiKey, messages, config, settings);
   }
@@ -144,25 +162,6 @@ export abstract class BaseAiService implements IAiApiService {
   protected showNoTitleInferredNotification(): void {
     this.notificationService?.showWarning("Could not infer title. The file name was not changed.");
   }
-
-  abstract getApiKeyFromSettings(settings: ChatGPT_MDSettings): string;
-  protected abstract callStreamingAPI(
-    apiKey: string | undefined,
-    messages: Message[],
-    config: Record<string, any>,
-    editor: Editor,
-    headingPrefix: string,
-    setAtCursor?: boolean,
-    settings?: ChatGPT_MDSettings,
-    callbacks?: StreamCallbacks
-  ): Promise<StreamingResponse>;
-
-  protected abstract callNonStreamingAPI(
-    apiKey: string | undefined,
-    messages: Message[],
-    config: Record<string, any>,
-    settings?: ChatGPT_MDSettings
-  ): Promise<any>;
 
   protected inferTitleFromMessages = async (apiKey: string, messages: string[], settings: any): Promise<string> => {
     try {
@@ -280,7 +279,7 @@ export abstract class BaseAiService implements IAiApiService {
     apiKey: string | undefined,
     messages: Message[],
     config: Record<string, any>,
-    editor: Editor,
+    editor: Editor | undefined,
     headingPrefix: string,
     setAtCursor?: boolean,
     settings?: ChatGPT_MDSettings,
@@ -289,7 +288,10 @@ export abstract class BaseAiService implements IAiApiService {
     try {
       const { payload, headers } = this.prepareApiCall(apiKey, messages, config, false, settings);
 
-      const cursorPositions = this.apiResponseParser.insertAssistantHeader(editor, headingPrefix, payload.model);
+      let cursorPositions;
+      if (editor && !callbacks) {
+        cursorPositions = this.apiResponseParser.insertAssistantHeader(editor, headingPrefix, payload.model);
+      }
 
       const response = await this.apiService.makeStreamingRequest(
         this.getApiEndpoint(config),

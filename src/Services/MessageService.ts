@@ -159,8 +159,8 @@ export class MessageService {
   /**
    * Clean messages from the editor content
    */
-  cleanMessagesFromNote(editor: Editor): string[] {
-    const messages = this.splitMessages(this.removeYAMLFrontMatter(editor.getValue()));
+  cleanMessages(content: string): string[] {
+    const messages = this.splitMessages(this.removeYAMLFrontMatter(content));
     return messages.map((msg) => this.removeCommentsFromMessages(msg));
   }
 
@@ -174,8 +174,21 @@ export class MessageService {
     messages: string[];
     messagesWithRole: Message[];
   }> {
-    // 1. Get raw message strings from the editor, split by horizontal rules.
-    const rawMessages = this.cleanMessagesFromNote(editor);
+    return this.getMessages(editor.getValue(), settings);
+  }
+
+  /**
+   * Get messages from a string content
+   */
+  async getMessages(
+    content: string,
+    settings: ChatGPT_MDSettings
+  ): Promise<{
+    messages: string[];
+    messagesWithRole: Message[];
+  }> {
+    // 1. Get raw message strings from the content, split by horizontal rules.
+    const rawMessages = this.cleanMessages(content);
 
     // 2. For each raw message, extract its role and content.
     // At this point, content still contains wikilinks like `[[...]]`.
@@ -330,5 +343,20 @@ export class MessageService {
 
     // Insert the response
     editor.replaceRange(`${assistantHeader}${formattedResponse}${userHeader}`, editor.getCursor());
+  }
+
+  appendUserMessage(editor: Editor, message: string, settings: ChatGPT_MDSettings): void {
+    const editorContent = editor.getValue();
+    const headingPrefix = getHeadingPrefix(settings.headingLevel);
+    const emptyUserHeader = this.getHeaderRole(headingPrefix, ROLE_USER);
+
+    const lastLine = editor.lastLine();
+    editor.setCursor({ line: lastLine + 1, ch: 0 });
+
+    if (editorContent.trimEnd().endsWith(emptyUserHeader.trim())) {
+      editor.replaceRange(message, editor.getCursor());
+    } else {
+      editor.replaceRange(emptyUserHeader + message, editor.getCursor());
+    }
   }
 }

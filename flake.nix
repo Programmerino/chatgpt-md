@@ -47,7 +47,7 @@
           '';
 
           meta = {
-            description = "A seamless integration of ChatGPT, OpenRouter.ai and local LLMs via Ollama into Obsidian";
+            description = "A seamless integration of OpenAI's ChatGPT into Obsidian";
             homepage = "https://github.com/bramses/chatgpt-md";
             license = lib.licenses.mit;
             maintainers = with lib.maintainers; [ ]; # Add your handle here

@@ -70,11 +70,13 @@ export class ApiResponseParser {
   async processStreamResponse(
     response: Response,
     serviceType: string,
-    editor: Editor,
-    cursorPositions: {
-      initialCursor: { line: number; ch: number };
-      newCursor: { line: number; ch: number };
-    },
+    editor: Editor | undefined,
+    cursorPositions:
+      | {
+          initialCursor: { line: number; ch: number };
+          newCursor: { line: number; ch: number };
+        }
+      | undefined,
     setAtCursor?: boolean,
     apiService?: ApiService,
     callbacks?: StreamCallbacks
@@ -84,7 +86,7 @@ export class ApiResponseParser {
     let text = "";
     let wasAborted = false;
 
-    if (!setAtCursor) {
+    if (editor && !setAtCursor && cursorPositions) {
       editor.setCursor(cursorPositions.newCursor);
     }
 
@@ -105,10 +107,12 @@ export class ApiResponseParser {
           const contentChunk = this.processStreamLine(line);
           if (contentChunk) {
             text += contentChunk;
-            if (setAtCursor) {
-              editor.replaceSelection(contentChunk);
-            } else {
-              editor.replaceRange(contentChunk, editor.getCursor());
+            if (editor) {
+              if (setAtCursor) {
+                editor.replaceSelection(contentChunk);
+              } else {
+                editor.replaceRange(contentChunk, editor.getCursor());
+              }
             }
             callbacks?.onChunk(contentChunk);
           }
@@ -120,7 +124,7 @@ export class ApiResponseParser {
 
     if (wasAborted) {
       apiService?.resetAbortedFlag();
-      if (!setAtCursor) {
+      if (editor && cursorPositions) {
         editor.replaceRange("", cursorPositions.initialCursor, editor.getCursor());
       }
       callbacks?.onDone("");
@@ -130,7 +134,9 @@ export class ApiResponseParser {
     if (unfinishedCodeBlock(text)) {
       const finalChunk = "\n```";
       text += finalChunk;
-      editor.replaceRange(finalChunk, editor.getCursor());
+      if (editor) {
+        editor.replaceRange(finalChunk, editor.getCursor());
+      }
       callbacks?.onChunk(finalChunk);
     }
 
@@ -140,16 +146,11 @@ export class ApiResponseParser {
         .join("\n");
       const citationsText = `\n\n**Sources:**\n${citations}`;
       text += citationsText;
-      editor.replaceRange(citationsText, editor.getCursor());
+      if (editor) {
+        editor.replaceRange(citationsText, editor.getCursor());
+      }
       callbacks?.onChunk(citationsText);
       this.collectedCitations.clear();
-    }
-
-    if (!setAtCursor) {
-      editor.replaceRange("", editor.getCursor(), {
-        line: Infinity,
-        ch: Infinity,
-      });
     }
 
     callbacks?.onDone(text);

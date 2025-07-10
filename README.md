@@ -51,18 +51,11 @@ You can change the global settings or use local parameters in any note via front
 ```
 ---
 system_commands: ['I am a helpful assistant.']
-temperature: 0.3
-top_p: 1
-max_tokens: 300
-presence_penalty: 0.5
-frequency_penalty: 0.5
-stream: true
-stop: null
-n: 1
 model: gpt-4.1-mini
-openaiUrl: https://api.openai.com
+stream: true
 ---
 ```
+You can also use any other parameters from the [OpenAI API documentation](https://platform.openai.com/docs/api-reference/chat).
 
 ### Commands 👨‍💻
 Run commands from Obsidian's command pallet via `cmd + p` or `ctrl + p` and start typing `chatgpt` or set hotkeys.

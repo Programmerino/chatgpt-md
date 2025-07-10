@@ -1,4 +1,4 @@
-import { App, Editor, MarkdownView } from "obsidian";
+import { App, Editor, MarkdownView, TFile } from "obsidian";
 import { ChatGPT_MDSettings } from "src/Models/Config";
 import { FileService } from "./FileService";
 import { EditorContentService } from "./EditorContentService";
@@ -85,6 +85,20 @@ export class EditorService {
     return this.messageService.getMessagesFromEditor(editor, settings);
   }
 
+  async getMessagesFromFileContent(
+    content: string,
+    settings: ChatGPT_MDSettings
+  ): Promise<{
+    messages: string[];
+    messagesWithRole: Message[];
+  }> {
+    return this.messageService.getMessages(content, settings);
+  }
+
+  appendUserMessage(editor: Editor, message: string, settings: ChatGPT_MDSettings): void {
+    this.messageService.appendUserMessage(editor, message, settings);
+  }
+
   // TemplateService delegations
 
   async createNewChatFromTemplate(settings: ChatGPT_MDSettings, fileName: string): Promise<void> {
@@ -97,8 +111,8 @@ export class EditorService {
 
   // FrontmatterService delegations
 
-  async getFrontmatter(view: MarkdownView, settings: ChatGPT_MDSettings): Promise<any> {
-    return await this.frontmatterService.getFrontmatter(view, settings);
+  async getFrontmatter(file: TFile | null, settings: ChatGPT_MDSettings): Promise<any> {
+    return await this.frontmatterService.getFrontmatter(file, settings);
   }
 
   // ResponseProcessingService delegations

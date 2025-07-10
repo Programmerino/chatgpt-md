@@ -98,14 +98,8 @@ export class ServiceLocator {
    * Get an AI API service based on the service type
    */
   getAiApiService(serviceType: string): IAiApiService {
-    switch (serviceType) {
-      case AI_SERVICE_OPENAI:
-        return new OpenAiService(this.errorService, this.notificationService);
-      default:
-        // Default to OpenAI for backward compatibility and as a safe fallback
-        console.warn(`Unknown AI service type: "${serviceType}". Defaulting to OpenAI.`);
-        return new OpenAiService(this.errorService, this.notificationService);
-    }
+    // Only OpenAI is supported now, so we can simplify this.
+    return new OpenAiService(this.errorService, this.notificationService);
   }
 
   // Getters for all services
