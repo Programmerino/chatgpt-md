@@ -21,6 +21,7 @@ export const MOVE_TO_CHAT_COMMAND_ID = "move-to-chat";
 export const INFER_TITLE_COMMAND_ID = "infer-title";
 export const CHOOSE_CHAT_TEMPLATE_COMMAND_ID = "choose-chat-template";
 export const CLEAR_CHAT_COMMAND_ID = "clear-chat";
+export const DEBUG_REQUEST_COMMAND_ID = "debug-create-request-note";
 
 export const CHAT_ERROR_MESSAGE_401 =
   "I am sorry. There was an authorization issue with the external API (Status 401).\nPlease check your API key in the settings";

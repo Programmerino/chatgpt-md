@@ -21,6 +21,7 @@ import {
   CLEAR_CHAT_COMMAND_ID,
   COMMENT_BLOCK_END,
   COMMENT_BLOCK_START,
+  DEBUG_REQUEST_COMMAND_ID,
   FETCH_MODELS_TIMEOUT_MS,
   INFER_TITLE_COMMAND_ID,
   MIN_AUTO_INFER_MESSAGES,
@@ -58,6 +59,7 @@ export class CommandRegistry {
   registerCommands(): void {
     this.registerChatCommand();
     this.registerSelectModelCommand();
+    this.registerDebugRequestCommand();
     this.registerAddDividerCommand();
     this.registerAddCommentBlockCommand();
     this.registerCancelGenerationCommand();
@@ -65,6 +67,50 @@ export class CommandRegistry {
     this.registerMoveToNewChatCommand();
     this.registerChooseChatTemplateCommand();
     this.registerClearChatCommand();
+  }
+
+  /**
+   * Handles the logic for automatically inferring a note's title.
+   */
+  private async handleAutoTitleInference(view: MarkdownView, frontmatter: any, messages: string[]): Promise<void> {
+    const settings = this.settingsService.getSettings();
+    const editorService = this.serviceLocator.getEditorService();
+
+    if (
+      !view.file || // Ensure file exists
+      !settings.autoInferTitle ||
+      !isTitleTimestampFormat(view.file.basename, settings.dateFormat) ||
+      messages.length < MIN_AUTO_INFER_MESSAGES
+    ) {
+      return; // Exit early if conditions aren't met
+    }
+
+    try {
+      this.updateStatusBar(`Inferring title...`);
+
+      // Use the same AI service that was used for the chat response
+      const aiServiceForTitle = this.serviceLocator.getAiApiService(frontmatter.aiService);
+
+      // The `frontmatter` object already contains the merged settings needed (model, url, etc.)
+      // The `inferTitle` method in the service will handle getting the correct API key from global settings.
+      const titleInferenceSettings = { ...settings, ...frontmatter };
+
+      // Ensure model is set for title inference. If not, the service's default will be used.
+      if (!titleInferenceSettings.model) {
+        console.warn("[ChatGPT MD] Model not specified for auto title inference. The service's default will be used.");
+      }
+
+      console.log(
+        `[ChatGPT MD] Auto-inferring title with service: ${frontmatter.aiService}, model: ${titleInferenceSettings.model || "default"}`
+      );
+
+      await aiServiceForTitle.inferTitle(view, titleInferenceSettings, messages, editorService);
+    } catch (error) {
+      console.error("[ChatGPT MD] Auto title inference failed:", error);
+      // Do not show a notice for background failure, just log it.
+    } finally {
+      this.updateStatusBar(``); // Clear status bar
+    }
   }
 
   /**
@@ -76,20 +122,16 @@ export class CommandRegistry {
       name: "Chat",
       icon: "message-circle",
       editorCallback: async (editor: Editor, view: MarkdownView) => {
+        if (!view.file) return;
+
         const editorService = this.serviceLocator.getEditorService();
         const settings = this.settingsService.getSettings();
         const frontmatter = await editorService.getFrontmatter(view, settings, this.plugin.app);
-
-        this.aiService = this.serviceLocator.getAiApiService(frontmatter.aiService);
+        const aiService = this.serviceLocator.getAiApiService(frontmatter.aiService);
 
         try {
-          // get messages from editor
-          const { messagesWithRole: messagesWithRoleAndMessage, messages } = await editorService.getMessagesFromEditor(
-            editor,
-            settings
-          );
+          const { messagesWithRole, messages } = await editorService.getMessagesFromEditor(editor, settings);
 
-          // move cursor to end of file if generateAtCursor is false
           if (!settings.generateAtCursor) {
             editorService.moveCursorToEnd(editor);
           }
@@ -100,11 +142,10 @@ export class CommandRegistry {
             this.updateStatusBar(`Calling ${frontmatter.model}... (use 'Stop AI Generation' to cancel)`);
           }
 
-          // Get the appropriate API key for the service
           const apiKeyToUse = this.apiAuthService.getApiKey(settings, frontmatter.aiService);
 
-          const response = await this.aiService.callAIAPI(
-            messagesWithRoleAndMessage,
+          const response = await aiService.callAIAPI(
+            messagesWithRole,
             frontmatter,
             getHeadingPrefix(settings.headingLevel),
             this.getAiApiUrls(frontmatter)[frontmatter.aiService],
@@ -114,65 +155,30 @@ export class CommandRegistry {
             settings
           );
 
+          this.updateStatusBar(""); // Clear status bar after API call
           editorService.processResponse(editor, response, settings);
 
-          if (
-            settings.autoInferTitle &&
-            isTitleTimestampFormat(view?.file?.basename, settings.dateFormat) &&
-            messagesWithRoleAndMessage.length > MIN_AUTO_INFER_MESSAGES
-          ) {
-            // Create a settings object with the correct API key and model
-            const settingsWithApiKey = {
-              ...frontmatter,
-              // Use the utility function to get the correct API key
-              openrouterApiKey: this.apiAuthService.getApiKey(settings, AI_SERVICE_OPENROUTER),
-              // Use the centralized method for URL
-              url: this.getAiApiUrls(frontmatter)[frontmatter.aiService],
-            };
-
-            // Ensure model is set for title inference
-            if (!settingsWithApiKey.model) {
-              console.log("[ChatGPT MD] Model not set for auto title inference, using default model");
-              if (frontmatter.aiService === AI_SERVICE_OPENAI) {
-                settingsWithApiKey.model = "gpt-4";
-              } else if (frontmatter.aiService === AI_SERVICE_OLLAMA) {
-                settingsWithApiKey.model = "llama2";
-              } else if (frontmatter.aiService === AI_SERVICE_OPENROUTER) {
-                settingsWithApiKey.model = "anthropic/claude-3-opus:beta";
-              } else if (frontmatter.aiService === AI_SERVICE_LMSTUDIO) {
-                settingsWithApiKey.model = "local-model";
-              } else if (frontmatter.aiService === AI_SERVICE_ANTHROPIC) {
-                settingsWithApiKey.model = "claude-3-sonnet-20240229";
-              }
-            }
-
-            console.log("[ChatGPT MD] Auto-inferring title with settings:", {
-              aiService: frontmatter.aiService,
-              model: settingsWithApiKey.model,
-            });
-
-            await this.aiService.inferTitle(view, settingsWithApiKey, messages, editorService);
+          // Call the extracted title inference handler
+          if (!response.wasAborted) {
+            // Don't infer title if chat was aborted
+            await this.handleAutoTitleInference(view, frontmatter, messages);
           }
         } catch (err) {
           if (err.name === "AbortError") {
             const message = "[ChatGPT MD] Request cancelled.";
-            if (Platform.isMobile) {
-              new Notice(message);
-            } else {
-              this.updateStatusBar("Request cancelled.");
-              setTimeout(() => this.updateStatusBar(""), 3000); // Clear after 3s
-            }
-            // Do not log to console for user-initiated aborts.
+            this.updateStatusBar("Request cancelled.");
+            if (Platform.isMobile) new Notice(message);
+            setTimeout(() => this.updateStatusBar(""), 3000);
             return;
           }
 
+          this.updateStatusBar("Error occurred."); // Show error in status
           if (Platform.isMobile) {
-            new Notice(`[ChatGPT MD] Calling ${frontmatter.model}. ` + err, 9000);
+            new Notice(`[ChatGPT MD] Error calling ${frontmatter.model}. ` + err, 9000);
           }
-          console.log(err);
+          console.error("[ChatGPT MD] Chat command error:", err);
+          setTimeout(() => this.updateStatusBar(""), 5000); // Clear error after a bit
         }
-
-        this.updateStatusBar("");
       },
     });
   }
@@ -242,6 +248,72 @@ export class CommandRegistry {
             // new Notice("Could not refresh model list in background.");
           }
         })(); // Self-invoking async function to run in background
+      },
+    });
+  }
+
+  /**
+   * Register the debug request command.
+   */
+  private registerDebugRequestCommand(): void {
+    this.plugin.addCommand({
+      id: DEBUG_REQUEST_COMMAND_ID,
+      name: "Debug: Create Request Note",
+      icon: "bug",
+      editorCallback: async (editor: Editor, view: MarkdownView) => {
+        if (!view.file) {
+          new Notice("Cannot run debug command without an active file.");
+          return;
+        }
+
+        const editorService = this.serviceLocator.getEditorService();
+        const settings = this.settingsService.getSettings();
+
+        try {
+          // 1. Get frontmatter and determine AI service
+          const frontmatter = await editorService.getFrontmatter(view, settings, this.plugin.app);
+          const aiService = this.serviceLocator.getAiApiService(frontmatter.aiService);
+
+          // 2. Get messages from editor (with links resolved, etc.)
+          const { messagesWithRole } = await editorService.getMessagesFromEditor(editor, settings);
+
+          // 3. Get the API key to pass validation (it's not sent anywhere)
+          const apiKeyToUse = this.apiAuthService.getApiKey(settings, frontmatter.aiService);
+
+          // 4. Prepare the payload using the new public method
+          const { payload, service } = aiService.getRequestPayloadForDebug(
+            apiKeyToUse,
+            messagesWithRole,
+            frontmatter,
+            settings
+          );
+
+          // 5. Stringify the payload
+          const payloadString = JSON.stringify(payload, null, 2);
+
+          // 6. Create the content for the new note
+          const debugNoteContent = `Debug output for: **${view.file.name}**
+Service: **${service}**
+Model: **${payload.model}**
+Timestamp: **${new Date().toISOString()}**
+
+---
+
+### Request Payload
+
+\`\`\`json
+${payloadString}
+\`\`\`
+`;
+          // 7. Create and open the debug file
+          const fileService = this.serviceLocator.getFileService();
+          await fileService.createAndOpenDebugFile(debugNoteContent, view.file.name);
+
+          new Notice("Debug note created successfully.");
+        } catch (err) {
+          new Notice(`[ChatGPT MD] Error creating debug note: ${err.message}`);
+          console.error("[ChatGPT MD] Error creating debug note:", err);
+        }
       },
     });
   }

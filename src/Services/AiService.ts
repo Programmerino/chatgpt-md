@@ -55,6 +55,16 @@ export interface IAiApiService {
     messages: string[],
     editorService: EditorService
   ): Promise<string>;
+
+  /**
+   * Prepare the request payload for debugging.
+   */
+  getRequestPayloadForDebug(
+    apiKey: string | undefined,
+    messages: Message[],
+    options: Record<string, any>,
+    settings: ChatGPT_MDSettings
+  ): { payload: Record<string, any>; service: string };
 }
 
 /**
@@ -127,6 +137,20 @@ export abstract class BaseAiService implements IAiApiService {
     return options.stream && editor
       ? this.callStreamingAPI(apiKey, messages, config, editor, headingPrefix, setAtCursor, settings)
       : this.callNonStreamingAPI(apiKey, messages, config, settings);
+  }
+
+  /**
+   * Public method to get the request payload for debugging.
+   * It prepares messages and creates the payload exactly as it would be for a real API call.
+   */
+  public getRequestPayloadForDebug(
+    apiKey: string | undefined,
+    messages: Message[],
+    options: Record<string, any>,
+    settings: ChatGPT_MDSettings
+  ): { payload: Record<string, any>; service: string } {
+    const { payload } = this.prepareApiCall(apiKey, messages, options, false, settings);
+    return { payload, service: this.serviceType };
   }
 
   /**

@@ -36,6 +36,26 @@ export class FileService {
   }
 
   /**
+   * Create a new debug file with the given content and open it.
+   */
+  async createAndOpenDebugFile(content: string, originalFileName: string): Promise<void> {
+    const timestamp = this.formatDate(new Date(), "YYYYMMDDhhmmss");
+    const debugFileName = `DEBUG - ${originalFileName.replace(/\.md$/, "")} - ${timestamp}.md`;
+
+    // Use the root of the vault for debug files for simplicity
+    const debugFilePath = `/${debugFileName}`;
+
+    try {
+      const newFile = await this.createNewFile(debugFilePath, content);
+      // Open the new file in a new pane
+      await this.app.workspace.openLinkText(newFile.path, "", true);
+    } catch (err) {
+      new Notice(`[ChatGPT MD] Error creating debug file: ${err.message}`);
+      console.error("[ChatGPT MD] Error creating debug file:", err);
+    }
+  }
+
+  /**
    * Sanitize a file name by removing or replacing invalid characters
    * @param fileName The file name to sanitize
    * @returns The sanitized file name
