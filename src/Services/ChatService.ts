@@ -265,7 +265,8 @@ export class ChatService {
           ROLE_ASSISTANT,
           frontmatterData.model as string
         );
-        const fullResponseText = `\n\n${HORIZONTAL_LINE_MD}\n\n${assistantHeader}${response.fullString}`;
+        // FIX: The assistantHeader from getHeaderRole already includes the separator.
+        const fullResponseText = `${assistantHeader}${response.fullString}`;
         await vault.append(file, fullResponseText);
 
         const activeView = this.serviceLocator.getApp().workspace.getActiveViewOfType(MarkdownView);
@@ -288,6 +289,53 @@ export class ChatService {
       callbacks.onDone("An error occurred. Check console.");
       console.error("[ChatGPT MD] Chat regeneration error:", err);
       new Notice(`[ChatGPT MD] Error: ${err.message}`);
+    } finally {
+      this.streaming = false;
+    }
+  }
+
+  public async regenerateResponseInPlace(file: TFile, assistantMessageIndex: number, callbacks: StreamCallbacks) {
+    if (this.streaming) {
+      new Notice("A chat is already in progress.");
+      return;
+    }
+    this.streaming = true;
+
+    try {
+      const editorService = this.serviceLocator.getEditorService();
+      const settings = this.settingsService.getSettings();
+
+      const { frontmatter, messageBlocks } = await this.getFileContentParts(file);
+      if (assistantMessageIndex <= 0 || assistantMessageIndex >= messageBlocks.length) {
+        throw new Error("Invalid message index for in-place regeneration.");
+      }
+
+      const messagesForContext = messageBlocks.slice(0, assistantMessageIndex);
+      const contentForContext = `${frontmatter}\n\n${messagesForContext.join(`\n\n${HORIZONTAL_LINE_MD}\n\n`)}`;
+
+      const { messagesWithRole } = await editorService.getMessagesFromFileContent(contentForContext, settings);
+      const frontmatterData = await editorService.getFrontmatter(file, settings);
+
+      const response = await this._callAndProcessAI(
+        file,
+        messagesWithRole,
+        frontmatterData,
+        settings,
+        undefined,
+        callbacks
+      );
+
+      if (response?.wasAborted) {
+        const e = new Error("Request aborted by user");
+        e.name = "AbortError";
+        throw e;
+      }
+
+      if (response) {
+        await this.updateMessage(file, assistantMessageIndex, response.fullString);
+      }
+    } catch (err) {
+      throw err;
     } finally {
       this.streaming = false;
     }

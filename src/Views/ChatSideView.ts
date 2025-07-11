@@ -9,6 +9,7 @@ import {
   debounce,
   Setting,
   Modal,
+  Menu,
 } from "obsidian";
 import { ServiceLocator } from "../core/ServiceLocator";
 import { Message } from "../Models/Message";
@@ -318,11 +319,41 @@ export class ChatSideView extends ItemView {
 
     const messageActions = messageEl.createDiv({ cls: "chat-message-actions" });
 
-    if (isLastUserMessage) {
+    // Regenerate action for assistant messages
+    if (message.role === "assistant") {
       const regenerateButton = messageActions.createEl("button", { cls: "chat-message-action-button" });
-      setIcon(regenerateButton, "zap");
-      regenerateButton.setAttribute("aria-label", "Generate response");
-      regenerateButton.addEventListener("click", () => this.handleRegenerate(index));
+      setIcon(regenerateButton, "refresh-cw");
+      regenerateButton.setAttribute("aria-label", "Regenerate response");
+      regenerateButton.addEventListener("click", (evt: MouseEvent) => {
+        const menu = new Menu();
+        menu.addItem((item) =>
+          item
+            .setTitle("Regenerate")
+            .setIcon("refresh-cw")
+            .setSection("regenerate")
+            .onClick(() => {
+              this.handleRegenerateInPlace(index);
+            })
+        );
+        menu.addItem((item) =>
+          item
+            .setTitle("Regenerate and branch")
+            .setIcon("git-branch-plus")
+            .setSection("regenerate")
+            .onClick(() => {
+              this.handleRegenerateAndBranch(index);
+            })
+        );
+        menu.showAtMouseEvent(evt);
+      });
+    }
+
+    // Generate response action for the last user message
+    if (isLastUserMessage) {
+      const generateButton = messageActions.createEl("button", { cls: "chat-message-action-button" });
+      setIcon(generateButton, "zap");
+      generateButton.setAttribute("aria-label", "Generate response");
+      generateButton.addEventListener("click", () => this.handleRegenerate(index));
     }
 
     const editButton = messageActions.createEl("button", { cls: "chat-message-action-button" });
@@ -551,11 +582,22 @@ export class ChatSideView extends ItemView {
     }
   }
 
+  // This is for the 'zap' icon on the last user message OR branching
   private async handleRegenerate(index: number) {
     if (this.isAwaitingResponse || !this.currentChatFile) return;
 
     this.setButtonState("generating");
-    this.startNewAssistantMessage(); // Show visual feedback immediately
+
+    // Immediately update the UI to reflect truncation for branching.
+    const messagesToRemove = Array.from(this.messageContainer.querySelectorAll<HTMLElement>(".chat-message")).filter(
+      (el) => {
+        const msgIndex = parseInt(el.dataset.messageIndex || "-1", 10);
+        return msgIndex > index;
+      }
+    );
+    messagesToRemove.forEach((el) => el.remove());
+
+    this.startNewAssistantMessage();
 
     try {
       await this.chatService.regenerateResponse(this.currentChatFile, index, {
@@ -573,7 +615,58 @@ export class ChatSideView extends ItemView {
     } finally {
       this.setButtonState("idle");
       this.textInput.focus();
+      // Force a full re-render from file to ensure UI is in sync.
+      this.currentMessagesCache = "";
+      await this.updateView();
     }
+  }
+
+  private async handleRegenerateInPlace(index: number) {
+    if (this.isAwaitingResponse || !this.currentChatFile) return;
+
+    const messageElToReplace = this.messageContainer.querySelector(`[data-message-index="${index}"]`) as HTMLElement;
+    if (!messageElToReplace) {
+      console.error(`Could not find message element for index ${index} to regenerate.`);
+      return;
+    }
+
+    this.setButtonState("generating");
+
+    // Replace the existing message with a new streaming placeholder
+    this.startNewAssistantMessage();
+    if (this.currentAssistantMessageEl) {
+      messageElToReplace.replaceWith(this.currentAssistantMessageEl);
+    }
+
+    try {
+      await this.chatService.regenerateResponseInPlace(this.currentChatFile, index, {
+        onChunk: (chunk) => this.appendChunkToView(chunk),
+        onDone: (fullText) => this.finalizeAssistantMessage(fullText),
+      });
+    } catch (err) {
+      if (this.currentAssistantMessageEl) {
+        // On any error, replace the streaming placeholder with the original element.
+        this.currentAssistantMessageEl.replaceWith(messageElToReplace);
+        this.currentAssistantMessageEl = null; // Clear it so it's not reused
+      }
+      if (err.name === "AbortError") {
+        new Notice("Regeneration cancelled.");
+      } else {
+        new Notice("Error during regeneration. Check console.");
+        console.error("[ChatGPT MD] In-place regeneration error:", err);
+      }
+    } finally {
+      this.setButtonState("idle");
+      this.scheduleUpdate();
+    }
+  }
+
+  private async handleRegenerateAndBranch(assistantMessageIndex: number) {
+    const userMessageIndex = assistantMessageIndex - 1;
+    if (userMessageIndex < 0) return;
+    // This existing method already does what we want for branching:
+    // it regenerates from a user prompt index.
+    await this.handleRegenerate(userMessageIndex);
   }
 
   private scrollToBottom() {
