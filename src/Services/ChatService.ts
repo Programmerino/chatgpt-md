@@ -39,14 +39,14 @@ export class ChatService {
   private async _callAndProcessAI(
     file: TFile,
     messagesWithRole: any[],
-    frontmatter: any,
+    frontmatter: Record<string, unknown>,
     settings: ChatGPT_MDSettings,
     editor?: Editor, // For direct streaming
     callbacks?: StreamCallbacks // For sidebar UI
   ) {
     const aiService = this.serviceLocator.getAiApiService();
     const headingPrefix = getHeadingPrefix(settings.headingLevel);
-    const apiKeyToUse = this.apiAuthService.getApiKey(settings, frontmatter.aiService);
+    const apiKeyToUse = this.apiAuthService.getApiKey(settings, frontmatter.aiService as string);
 
     if (Platform.isMobile) {
       new Notice(`[ChatGPT MD] Calling ${frontmatter.model}`);
@@ -178,7 +178,7 @@ export class ChatService {
         const assistantHeader = this.messageService.getHeaderRole(
           getHeadingPrefix(settings.headingLevel),
           ROLE_ASSISTANT,
-          frontmatter.model
+          frontmatter.model as string
         );
         const fullResponseText = `${assistantHeader}${response.fullString}`;
         await vault.append(file, fullResponseText);

@@ -105,7 +105,7 @@ export const getHeaderRole = (headingPrefix: string, role: string, model?: strin
     model ? `<span style="font-size: small;"> (${model})</span>` : ``
   }${NEWLINE}`;
 
-export const parseSettingsFrontmatter = (yamlString: string): Record<string, any> => {
+export const parseSettingsFrontmatter = (yamlString: string): Record<string, unknown> => {
   if (!yamlString) {
     return {};
   }

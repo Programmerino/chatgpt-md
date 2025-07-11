@@ -73,10 +73,14 @@ export class OpenAiService extends BaseAiService implements IAiApiService {
     return ROLE_SYSTEM;
   }
 
-  createPayload(config: OpenAIConfig, messages: Message[]): OpenAIStreamPayload {
-    const modelName = config.model.includes("@") ? config.model.split("@")[1] : config.model;
+  createPayload(config: Record<string, unknown>, messages: Message[]): OpenAIStreamPayload {
+    const modelName =
+      typeof config.model === "string" && config.model.includes("@")
+        ? config.model.split("@")[1]
+        : (config.model as string);
 
-    const processedMessages = this.processSystemCommands(messages, config.system_commands);
+    const systemCommands = Array.isArray(config.system_commands) ? (config.system_commands as string[]) : null;
+    const processedMessages = this.processSystemCommands(messages, systemCommands);
 
     const payload: OpenAIStreamPayload = {
       model: modelName,
@@ -86,13 +90,13 @@ export class OpenAiService extends BaseAiService implements IAiApiService {
 
     const isRestrictedModel = modelName.includes("search");
 
-    if (config.max_tokens !== undefined) payload.max_tokens = config.max_tokens;
+    if (config.max_tokens !== undefined) payload.max_tokens = config.max_tokens as number;
 
     if (!isRestrictedModel) {
-      if (config.temperature !== undefined) payload.temperature = config.temperature;
-      if (config.top_p !== undefined) payload.top_p = config.top_p;
-      if (config.presence_penalty !== undefined) payload.presence_penalty = config.presence_penalty;
-      if (config.frequency_penalty !== undefined) payload.frequency_penalty = config.frequency_penalty;
+      if (config.temperature !== undefined) payload.temperature = config.temperature as number;
+      if (config.top_p !== undefined) payload.top_p = config.top_p as number;
+      if (config.presence_penalty !== undefined) payload.presence_penalty = config.presence_penalty as number;
+      if (config.frequency_penalty !== undefined) payload.frequency_penalty = config.frequency_penalty as number;
     }
 
     return payload;
@@ -101,7 +105,7 @@ export class OpenAiService extends BaseAiService implements IAiApiService {
   protected async callStreamingAPI(
     apiKey: string | undefined,
     messages: Message[],
-    config: OpenAIConfig,
+    config: Record<string, unknown>,
     editor: Editor | undefined,
     headingPrefix: string,
     setAtCursor?: boolean | undefined,
@@ -123,7 +127,7 @@ export class OpenAiService extends BaseAiService implements IAiApiService {
   protected async callNonStreamingAPI(
     apiKey: string | undefined,
     messages: Message[],
-    config: OpenAIConfig,
+    config: Record<string, unknown>,
     settings?: ChatGPT_MDSettings
   ): Promise<any> {
     return this.defaultCallNonStreamingAPI(apiKey, messages, config, settings);

@@ -13,7 +13,7 @@ export class FrontmatterManager {
    * @param file - The TFile to read frontmatter from
    * @returns Promise resolving to frontmatter object or null if no frontmatter exists
    */
-  async readFrontmatter(file: TFile): Promise<Record<string, any> | null> {
+  async readFrontmatter(file: TFile): Promise<Record<string, unknown> | null> {
     try {
       // Use Obsidian's metadata cache to get frontmatter
       const fileCache = this.app.metadataCache.getFileCache(file);
@@ -35,7 +35,7 @@ export class FrontmatterManager {
    * @param file - The TFile to write frontmatter to
    * @param frontmatter - The frontmatter object to write
    */
-  async writeFrontmatter(file: TFile, frontmatter: Record<string, any>): Promise<void> {
+  async writeFrontmatter(file: TFile, frontmatter: Record<string, unknown>): Promise<void> {
     try {
       await this.app.fileManager.processFrontMatter(file, (existingFrontmatter) => {
         // Clear existing frontmatter and replace with new
@@ -58,7 +58,7 @@ export class FrontmatterManager {
    * @param key - The frontmatter key to update
    * @param value - The new value for the key
    */
-  async updateFrontmatterField(file: TFile, key: string, value: any): Promise<void> {
+  async updateFrontmatterField(file: TFile, key: string, value: unknown): Promise<void> {
     try {
       await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
         frontmatter[key] = value;
@@ -74,7 +74,7 @@ export class FrontmatterManager {
    * @param file - The TFile to update
    * @param updates - Object containing key-value pairs to merge
    */
-  async mergeFrontmatter(file: TFile, updates: Record<string, any>): Promise<void> {
+  async mergeFrontmatter(file: TFile, updates: Record<string, unknown>): Promise<void> {
     try {
       await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
         // Merge updates into existing frontmatter
@@ -160,7 +160,7 @@ export class FrontmatterManager {
    * @param defaultValue - Default value to return if key doesn't exist
    * @returns The value of the specified key or defaultValue
    */
-  async getFrontmatterField<T = any>(file: TFile, key: string, defaultValue?: T): Promise<T | undefined> {
+  async getFrontmatterField<T = unknown>(file: TFile, key: string, defaultValue?: T): Promise<T | undefined> {
     try {
       const frontmatter = await this.readFrontmatter(file);
 

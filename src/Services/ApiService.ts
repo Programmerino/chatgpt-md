@@ -46,6 +46,9 @@ export class ApiService {
     console.log("[ChatGPT MD] Created new AbortController for streaming request.");
 
     try {
+      // Note: `fetch` is used here instead of `requestUrl` because `requestUrl`
+      // does not support streaming responses, which is essential for this feature.
+      // This is a known limitation when targeting mobile platforms.
       const response = await fetch(url, {
         method: "POST",
         headers,

@@ -132,8 +132,7 @@
   border: 1px solid var(--background-modifier-border);
 }
 
-.chat-message:hover .chat-message-actions,
-.chat-message.is-editing .chat-message-actions {
+.chat-message:hover .chat-message-actions {
   opacity: 1;
 }
 
@@ -219,19 +218,52 @@
   background-color: var(--background-modifier-error-hover);
 }
 
-/* Edit State Styles */
-.chat-message.is-editing .chat-message-content textarea {
-  width: 100%;
+/* Full-view editor styles */
+.chat-editor-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: var(--size-4-2);
+  padding: var(--size-4-3);
   box-sizing: border-box;
+}
+
+.chat-editor-container textarea {
+  flex-grow: 1;
+  resize: none;
+  border-radius: var(--radius-m);
   padding: var(--size-4-2);
-  margin-bottom: var(--size-4-2);
-  border: 1px solid var(--background-modifier-border-focus);
-  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-secondary);
   color: var(--text-normal);
+  font-family: var(--font-interface);
+  line-height: var(--line-height-normal);
 }
 
 .chat-edit-actions {
   display: flex;
   justify-content: flex-end;
   gap: var(--size-4-2);
+}
+
+.chat-edit-actions button {
+  background-color: var(--background-modifier-border);
+  border: none;
+  color: var(--text-normal);
+  border-radius: var(--radius-m);
+  padding: var(--size-4-2) var(--size-4-4);
+  cursor: pointer;
+}
+
+.chat-edit-actions button:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.chat-edit-actions button.mod-cta {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.chat-edit-actions button.mod-cta:hover {
+  background-color: var(--interactive-accent-hover);
 }

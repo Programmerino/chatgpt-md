@@ -25,7 +25,7 @@ export interface StreamCallbacks {
 export interface IAiApiService {
   callAIAPI(
     messages: Message[],
-    options: Record<string, any>,
+    options: Record<string, unknown>,
     headingPrefix: string,
     editor?: Editor,
     setAtCursor?: boolean,
@@ -42,7 +42,7 @@ export interface IAiApiService {
 
   inferTitle(
     view: MarkdownView,
-    config: Record<string, any>,
+    config: Record<string, unknown>,
     messages: string[],
     editorService: EditorService
   ): Promise<string>;
@@ -50,7 +50,7 @@ export interface IAiApiService {
   getRequestPayloadForDebug(
     apiKey: string | undefined,
     messages: Message[],
-    options: Record<string, any>,
+    options: Record<string, unknown>,
     settings: ChatGPT_MDSettings
   ): { payload: Record<string, any>; service: string };
 }
@@ -79,13 +79,13 @@ export abstract class BaseAiService implements IAiApiService {
   // --- ABSTRACT MEMBERS ---
   protected abstract serviceType: string;
   abstract getDefaultConfig(): Record<string, any>;
-  abstract createPayload(config: Record<string, any>, messages: Message[]): Record<string, any>;
+  abstract createPayload(config: Record<string, unknown>, messages: Message[]): Record<string, any>;
   abstract getApiKeyFromSettings(settings: ChatGPT_MDSettings): string;
   protected abstract getSystemMessageRole(): string;
   protected abstract callStreamingAPI(
     apiKey: string | undefined,
     messages: Message[],
-    config: Record<string, any>,
+    config: Record<string, unknown>,
     editor: Editor | undefined,
     headingPrefix: string,
     setAtCursor?: boolean,
@@ -95,14 +95,14 @@ export abstract class BaseAiService implements IAiApiService {
   protected abstract callNonStreamingAPI(
     apiKey: string | undefined,
     messages: Message[],
-    config: Record<string, any>,
+    config: Record<string, unknown>,
     settings?: ChatGPT_MDSettings
   ): Promise<any>;
 
   // --- CONCRETE METHODS ---
   async callAIAPI(
     messages: Message[],
-    options: Record<string, any> = {},
+    options: Record<string, unknown> = {},
     headingPrefix: string,
     editor?: Editor,
     setAtCursor?: boolean,
@@ -128,7 +128,7 @@ export abstract class BaseAiService implements IAiApiService {
       });
     }
 
-    return options.stream
+    return (config.stream as boolean)
       ? this.callStreamingAPI(apiKey, messages, config, editor, headingPrefix, setAtCursor, settings, callbacks)
       : this.callNonStreamingAPI(apiKey, messages, config, settings);
   }
@@ -136,7 +136,7 @@ export abstract class BaseAiService implements IAiApiService {
   public getRequestPayloadForDebug(
     apiKey: string | undefined,
     messages: Message[],
-    options: Record<string, any>,
+    options: Record<string, unknown>,
     settings: ChatGPT_MDSettings
   ): { payload: Record<string, any>; service: string } {
     const { payload } = this.prepareApiCall(apiKey, messages, options, false, settings);
@@ -145,7 +145,7 @@ export abstract class BaseAiService implements IAiApiService {
 
   async inferTitle(
     view: MarkdownView,
-    config: Record<string, any>,
+    config: Record<string, unknown>,
     messages: string[],
     editorService: EditorService
   ): Promise<string> {
@@ -172,7 +172,7 @@ export abstract class BaseAiService implements IAiApiService {
       if (!view.file) {
         throw new Error("No active file found");
       }
-      const apiKey = this.getApiKeyFromSettings(config as ChatGPT_MDSettings);
+      const apiKey = this.getApiKeyFromSettings(config as unknown as ChatGPT_MDSettings);
 
       const titleResponse = await this.inferTitleFromMessages(apiKey, messages, config);
 
@@ -206,7 +206,11 @@ export abstract class BaseAiService implements IAiApiService {
     this.notificationService?.showWarning("Could not infer title. The file name was not changed.");
   }
 
-  protected inferTitleFromMessages = async (apiKey: string, messages: string[], settings: any): Promise<string> => {
+  protected inferTitleFromMessages = async (
+    apiKey: string,
+    messages: string[],
+    settings: Record<string, unknown>
+  ): Promise<string> => {
     try {
       const prompt = `Infer a concise, suitable filename for the following chat conversation. Return only the title, without any additional text or quotes. The title should be in ${
         settings.inferTitleLanguage
@@ -235,7 +239,7 @@ export abstract class BaseAiService implements IAiApiService {
   protected async callNonStreamingAPIForTitleInference(
     apiKey: string | undefined,
     messages: Message[],
-    config: Record<string, any>,
+    config: Record<string, unknown>,
     settings?: any
   ): Promise<any> {
     config.stream = false;
@@ -264,8 +268,9 @@ export abstract class BaseAiService implements IAiApiService {
     };
   }
 
-  protected getApiEndpoint(config: Record<string, any>): string {
-    return `${config.url}${API_ENDPOINTS[this.serviceType as keyof typeof API_ENDPOINTS]}`;
+  protected getApiEndpoint(config: Record<string, unknown>): string {
+    const url = typeof config.url === "string" ? config.url : "";
+    return `${url}${API_ENDPOINTS[this.serviceType as keyof typeof API_ENDPOINTS]}`;
   }
 
   protected addPluginSystemMessage(messages: Message[]): Message[] {
@@ -288,7 +293,7 @@ export abstract class BaseAiService implements IAiApiService {
   protected prepareApiCall(
     apiKey: string | undefined,
     messages: Message[],
-    config: Record<string, any>,
+    config: Record<string, unknown>,
     skipPluginSystemMessage: boolean = false,
     settings?: ChatGPT_MDSettings
   ) {
@@ -306,22 +311,24 @@ export abstract class BaseAiService implements IAiApiService {
 
   protected handleApiCallError(
     err: any,
-    config: Record<string, any>,
+    config: Record<string, unknown>,
     isTitleInference: boolean | string | undefined = false
   ): any {
     console.error(`[ChatGPT MD] ${this.serviceType} API error:`, err);
     if (isTitleInference) throw err;
+    const model = typeof config.model === "string" ? config.model : "";
+    const url = typeof config.url === "string" ? config.url : "";
     return this.errorService.handleApiError(err, this.serviceType, {
       returnForChat: true,
       showNotification: true,
-      context: { model: config.model, url: config.url },
+      context: { model, url },
     });
   }
 
   protected async defaultCallStreamingAPI(
     apiKey: string | undefined,
     messages: Message[],
-    config: Record<string, any>,
+    config: Record<string, unknown>,
     editor: Editor | undefined,
     headingPrefix: string,
     setAtCursor?: boolean,
@@ -386,7 +393,7 @@ export abstract class BaseAiService implements IAiApiService {
   protected async defaultCallNonStreamingAPI(
     apiKey: string | undefined,
     messages: Message[],
-    config: Record<string, any>,
+    config: Record<string, unknown>,
     settings?: ChatGPT_MDSettings
   ): Promise<any> {
     try {

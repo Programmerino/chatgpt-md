@@ -67,7 +67,11 @@ export class CommandRegistry {
   /**
    * Handles the logic for automatically inferring a note's title.
    */
-  public async handleAutoTitleInference(view: MarkdownView, frontmatter: any, messages: string[]): Promise<void> {
+  public async handleAutoTitleInference(
+    view: MarkdownView,
+    frontmatter: Record<string, unknown>,
+    messages: string[]
+  ): Promise<void> {
     const settings = this.settingsService.getSettings();
     const editorService = this.serviceLocator.getEditorService();
 
@@ -84,7 +88,7 @@ export class CommandRegistry {
       const aiServiceForTitle = this.serviceLocator.getAiApiService();
       const titleInferenceConfig = { ...settings, ...frontmatter };
 
-      if (!titleInferenceConfig.model) {
+      if (!(titleInferenceConfig as { model?: string }).model) {
         console.warn("[ChatGPT MD] Model not specified for auto title inference. The service's default will be used.");
       }
       this.serviceLocator.getNotificationService().showStatusBarMessage("Inferring title...", 0);

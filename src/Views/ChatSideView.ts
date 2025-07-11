@@ -27,6 +27,7 @@ export class ChatSideView extends ItemView {
   private paramsToggleBtn: HTMLElement;
   private paramsEl: HTMLElement;
   private messageContainer: HTMLElement;
+  private editorContainer: HTMLElement;
   private inputForm: HTMLFormElement;
   private textInput: HTMLTextAreaElement;
   private sendButton: HTMLButtonElement;
@@ -111,6 +112,7 @@ export class ChatSideView extends ItemView {
     this.headerEl = container.createDiv({ cls: "chat-view-header" });
     this.paramsEl = container.createDiv({ cls: "chat-view-params", attr: { style: "display: none;" } });
     this.messageContainer = container.createDiv({ cls: "chat-messages" });
+    this.editorContainer = container.createDiv({ cls: "chat-editor-container", attr: { style: "display: none;" } });
 
     const inputContainer = container.createDiv({ cls: "chat-input-container" });
     this.inputForm = inputContainer.createEl("form");
@@ -208,7 +210,10 @@ export class ChatSideView extends ItemView {
 
     const frontmatterService = this.serviceLocator.getFrontmatterService();
     const settings = this.serviceLocator.getSettingsService().getSettings();
-    const frontmatter = await frontmatterService.getFrontmatter(this.currentChatFile, settings);
+    const frontmatter = (await frontmatterService.getFrontmatter(this.currentChatFile, settings)) as Record<
+      string,
+      any
+    >;
 
     const debouncedUpdate = debounce(
       async (key: string, value: any) => {
@@ -304,7 +309,7 @@ export class ChatSideView extends ItemView {
     const editButton = messageActions.createEl("button", { cls: "chat-message-action-button" });
     setIcon(editButton, "pencil");
     editButton.setAttribute("aria-label", "Edit message");
-    editButton.addEventListener("click", () => this.handleEdit(messageEl, message, index));
+    editButton.addEventListener("click", () => this.handleEdit(message, index));
 
     const deleteButton = messageActions.createEl("button", { cls: "chat-message-action-button" });
     setIcon(deleteButton, "trash-2");
@@ -327,26 +332,33 @@ export class ChatSideView extends ItemView {
     return messageEl;
   }
 
-  private handleEdit(messageEl: HTMLElement, message: Message, index: number) {
-    const contentEl = messageEl.querySelector(".chat-message-content") as HTMLElement;
-    if (!contentEl) return;
+  private handleEdit(message: Message, index: number) {
+    // Hide main view
+    this.messageContainer.style.display = "none";
+    this.inputForm.style.display = "none";
+    this.headerEl.style.display = "none";
+    this.paramsEl.style.display = "none";
 
-    contentEl.empty();
-    messageEl.addClass("is-editing");
+    // Show editor
+    this.editorContainer.style.display = "flex";
+    this.editorContainer.empty();
 
-    const textArea = contentEl.createEl("textarea", { text: message.content });
-    textArea.rows = 8;
-    textArea.style.width = "100%";
+    const textArea = this.editorContainer.createEl("textarea", { text: message.content });
     textArea.focus();
 
-    const buttonContainer = contentEl.createDiv({ cls: "chat-edit-actions" });
+    const buttonContainer = this.editorContainer.createDiv({ cls: "chat-edit-actions" });
     const saveButton = buttonContainer.createEl("button", { text: "Save", cls: "mod-cta" });
     const cancelButton = buttonContainer.createEl("button", { text: "Cancel" });
 
-    const removeEditUI = () => {
-      messageEl.removeClass("is-editing");
-      contentEl.empty();
-      MarkdownRenderer.render(this.app, message.content, contentEl, this.currentChatFile?.path || "", this);
+    const restoreMainView = () => {
+      // Hide editor
+      this.editorContainer.style.display = "none";
+      this.editorContainer.empty();
+
+      // Show main view
+      this.messageContainer.style.display = "flex";
+      this.inputForm.style.display = "flex";
+      this.headerEl.style.display = "flex";
     };
 
     saveButton.onclick = async () => {
@@ -355,15 +367,16 @@ export class ChatSideView extends ItemView {
         try {
           await this.chatService.updateMessage(this.currentChatFile, index, newContent);
           new Notice("Message updated.");
+          restoreMainView();
           this.scheduleUpdate();
         } catch (error) {
           new Notice("Failed to update message.");
           console.error(error);
-          removeEditUI();
+          restoreMainView();
         }
       }
     };
-    cancelButton.onclick = removeEditUI;
+    cancelButton.onclick = restoreMainView;
   }
 
   private async handleDelete(messageEl: HTMLElement, index: number) {

@@ -11,8 +11,8 @@ export class FrontmatterService {
     private frontmatterManager: FrontmatterManager
   ) {}
 
-  async getFrontmatter(file: TFile | null, settings: ChatGPT_MDSettings): Promise<any> {
-    let frontmatter: Record<string, any> = {};
+  async getFrontmatter(file: TFile | null, settings: ChatGPT_MDSettings): Promise<Record<string, unknown>> {
+    let frontmatter: Record<string, unknown> = {};
 
     if (file) {
       const fileFrontmatter = await this.frontmatterManager.readFrontmatter(file);
@@ -25,7 +25,7 @@ export class FrontmatterService {
       ? parseSettingsFrontmatter(settings.defaultChatFrontmatter)
       : {};
 
-    const mergedConfig: Record<string, any> = {
+    const mergedConfig: Record<string, unknown> = {
       ...settings,
       ...defaultFrontmatter,
       ...frontmatter,
@@ -33,12 +33,12 @@ export class FrontmatterService {
 
     // Simplify service determination - it's always OpenAI now
     mergedConfig.aiService = AI_SERVICE_OPENAI;
-    mergedConfig.url = mergedConfig.openaiUrl || settings.openaiUrl || DEFAULT_OPENAI_CONFIG.url;
+    mergedConfig.url = (mergedConfig.openaiUrl as string) || settings.openaiUrl || DEFAULT_OPENAI_CONFIG.url;
 
     return mergedConfig;
   }
 
-  async updateFrontmatterField(file: TFile, key: string, value: any): Promise<void> {
+  async updateFrontmatterField(file: TFile, key: string, value: unknown): Promise<void> {
     try {
       await this.frontmatterManager.updateFrontmatterField(file, key, value);
     } catch (error) {
