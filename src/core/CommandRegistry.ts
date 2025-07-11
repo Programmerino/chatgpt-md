@@ -1,29 +1,17 @@
-import { Editor, MarkdownView, Notice, Platform, Plugin } from "obsidian";
+import { Editor, MarkdownView, Notice, Plugin } from "obsidian";
 import { ServiceLocator } from "./ServiceLocator";
 import { SettingsService } from "../Services/SettingsService";
-import { IAiApiService } from "src/Services/AiService";
-import { AiModelSuggestModal } from "src/Views/AiModelSuggestModal";
 import { DEFAULT_OPENAI_CONFIG, fetchAvailableOpenAiModels } from "src/Services/OpenAiService";
 import {
-  ADD_COMMENT_BLOCK_COMMAND_ID,
-  ADD_HR_COMMAND_ID,
   AI_SERVICE_OPENAI,
   CALL_CHATGPT_API_COMMAND_ID,
   CHOOSE_CHAT_TEMPLATE_COMMAND_ID,
   CLEAR_CHAT_COMMAND_ID,
-  COMMENT_BLOCK_END,
-  COMMENT_BLOCK_START,
   DEBUG_REQUEST_COMMAND_ID,
   FETCH_MODELS_TIMEOUT_MS,
-  INFER_TITLE_COMMAND_ID,
-  MIN_AUTO_INFER_MESSAGES,
-  MOVE_TO_CHAT_COMMAND_ID,
-  NEWLINE,
-  ROLE_USER,
   STOP_GENERATING_COMMAND_ID,
   TOGGLE_CHAT_SIDEBAR_COMMAND_ID,
 } from "src/Constants";
-import { isTitleTimestampFormat } from "src/Utilities/TextHelpers";
 import { ApiAuthService, isValidApiKey } from "../Services/ApiAuthService";
 import { CHAT_SIDE_VIEW_TYPE } from "src/Views/ChatSideView";
 
@@ -53,51 +41,10 @@ export class CommandRegistry {
   registerCommands(): void {
     this.registerChatCommand();
     this.registerToggleSidebarCommand();
-    this.registerSelectModelCommand();
     this.registerDebugRequestCommand();
-    this.registerAddDividerCommand();
-    this.registerAddCommentBlockCommand();
     this.registerCancelGenerationCommand();
-    this.registerInferTitleCommand();
-    this.registerMoveToNewChatCommand();
     this.registerChooseChatTemplateCommand();
     this.registerClearChatCommand();
-  }
-
-  /**
-   * Handles the logic for automatically inferring a note's title.
-   */
-  public async handleAutoTitleInference(
-    view: MarkdownView,
-    frontmatter: Record<string, unknown>,
-    messages: string[]
-  ): Promise<void> {
-    const settings = this.settingsService.getSettings();
-    const editorService = this.serviceLocator.getEditorService();
-
-    if (
-      !view.file || // Ensure file exists
-      !settings.autoInferTitle ||
-      !isTitleTimestampFormat(view.file.basename, settings.dateFormat) ||
-      messages.length < MIN_AUTO_INFER_MESSAGES
-    ) {
-      return; // Exit early if conditions aren't met
-    }
-
-    try {
-      const aiServiceForTitle = this.serviceLocator.getAiApiService();
-      const titleInferenceConfig = { ...settings, ...frontmatter };
-
-      if (!(titleInferenceConfig as { model?: string }).model) {
-        console.warn("[ChatGPT MD] Model not specified for auto title inference. The service's default will be used.");
-      }
-      this.serviceLocator.getNotificationService().showStatusBarMessage("Inferring title...", 0);
-      await aiServiceForTitle.inferTitle(view, titleInferenceConfig, messages, editorService);
-    } catch (error) {
-      console.error("[ChatGPT MD] Auto title inference failed:", error);
-    } finally {
-      this.serviceLocator.getNotificationService().clearStatusBar();
-    }
   }
 
   /**
@@ -138,22 +85,6 @@ export class CommandRegistry {
             workspace.revealLeaf(leaf);
           }
         }
-      },
-    });
-  }
-
-  /**
-   * Register the select model command
-   */
-  private registerSelectModelCommand(): void {
-    this.plugin.addCommand({
-      id: "select-model-command",
-      name: "Select Model",
-      icon: "list",
-      editorCallback: async (editor: Editor, view: MarkdownView) => {
-        const editorService = this.serviceLocator.getEditorService();
-        // Immediately open the modal with the promise for models
-        new AiModelSuggestModal(this.plugin.app, view, editorService, this.fetchAvailableModels()).open();
       },
     });
   }
@@ -208,36 +139,6 @@ export class CommandRegistry {
   }
 
   /**
-   * Register the add divider command
-   */
-  private registerAddDividerCommand(): void {
-    this.plugin.addCommand({
-      id: ADD_HR_COMMAND_ID,
-      name: "Add divider",
-      icon: "minus",
-      editorCallback: async (editor: Editor, _view: MarkdownView) => {
-        const editorService = this.serviceLocator.getEditorService();
-        const settings = this.settingsService.getSettings();
-        editorService.addHorizontalRule(editor, ROLE_USER, settings.headingLevel);
-      },
-    });
-  }
-
-  /**
-   * Register the add comment block command
-   */
-  private registerAddCommentBlockCommand(): void {
-    this.plugin.addCommand({
-      id: ADD_COMMENT_BLOCK_COMMAND_ID,
-      name: "Add comment block",
-      icon: "comment",
-      editorCallback: (editor: Editor, _view: MarkdownView) => {
-        this.serviceLocator.getEditorService().addCommentBlock(editor, COMMENT_BLOCK_START, COMMENT_BLOCK_END);
-      },
-    });
-  }
-
-  /**
    * Register the stop/cancel command
    */
   private registerCancelGenerationCommand(): void {
@@ -248,43 +149,6 @@ export class CommandRegistry {
       callback: () => {
         this.serviceLocator.getApiService().cancelRequest();
         new Notice("Stop command issued.");
-      },
-    });
-  }
-
-  /**
-   * Register the infer title command
-   */
-  private registerInferTitleCommand(): void {
-    this.plugin.addCommand({
-      id: INFER_TITLE_COMMAND_ID,
-      name: "Infer title",
-      icon: "subtitles",
-      editorCallback: async (editor: Editor, view: MarkdownView) => {
-        const chatService = this.serviceLocator.getChatService();
-        await chatService.inferTitle(editor, view);
-      },
-    });
-  }
-
-  /**
-   * Register the move to new chat command
-   */
-  private registerMoveToNewChatCommand(): void {
-    this.plugin.addCommand({
-      id: MOVE_TO_CHAT_COMMAND_ID,
-      name: "Create new chat with highlighted text",
-      icon: "highlighter",
-      editorCallback: async (editor: Editor, _view: MarkdownView) => {
-        const editorService = this.serviceLocator.getEditorService();
-        const settings = this.settingsService.getSettings();
-
-        try {
-          await editorService.createNewChatWithHighlightedText(editor, settings);
-        } catch (err) {
-          console.error(`[ChatGPT MD] Error in Create new chat with highlighted text`, err);
-          new Notice(`[ChatGPT MD] Error in Create new chat with highlighted text, check console`);
-        }
       },
     });
   }

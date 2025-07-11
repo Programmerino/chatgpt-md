@@ -1,6 +1,6 @@
 {
   "name": "chatgpt-md",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "description": "A seamless integration of OpenAI's ChatGPT into Obsidian.",
   "main": "main.js",
   "type": "module",

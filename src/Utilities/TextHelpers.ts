@@ -63,34 +63,6 @@ export const extractRoleAndMessage = (message: string) => {
   }
 };
 
-export const removeCommentsFromMessages = (message: string) => {
-  try {
-    const commentBlock = /=begin-chatgpt-md-comment[\s\S]*?=end-chatgpt-md-comment/g;
-
-    // remove comment block
-    return message.replace(commentBlock, "");
-  } catch (err) {
-    throw new Error("Error removing comments from messages" + err);
-  }
-};
-
-const generateDatePattern = (format: string) => {
-  const pattern = format
-    .replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&") // Escape any special characters
-    .replace("YYYY", "\\d{4}") // Match exactly four digits for the year
-    .replace("MM", "\\d{2}") // Match exactly two digits for the month
-    .replace("DD", "\\d{2}") // Match exactly two digits for the day
-    .replace("hh", "\\d{2}") // Match exactly two digits for the hour
-    .replace("mm", "\\d{2}") // Match exactly two digits for the minute
-    .replace("ss", "\\d{2}"); // Match exactly two digits for the second
-
-  return new RegExp(`^${pattern}`);
-};
-
-export const isTitleTimestampFormat = (title: string = "", dateFormat: string): boolean => {
-  return title?.length == dateFormat.length && generateDatePattern(dateFormat).test(title);
-};
-
 export const getHeadingPrefix = (headingLevel: number) => {
   if (headingLevel === 0) {
     return "";

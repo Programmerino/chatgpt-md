@@ -1,10 +1,5 @@
 import { DEFAULT_OPENAI_CONFIG } from "src/Services/OpenAiService";
-import {
-  DEFAULT_CHAT_FRONT_MATTER,
-  DEFAULT_DATE_FORMAT,
-  DEFAULT_HEADING_LEVEL,
-  DEFAULT_INFER_TITLE_LANGUAGE,
-} from "../Constants";
+import { DEFAULT_CHAT_FRONT_MATTER, DEFAULT_DATE_FORMAT, DEFAULT_HEADING_LEVEL } from "../Constants";
 
 /**
  * API key settings
@@ -30,10 +25,6 @@ export interface FolderSettings {
 export interface ChatBehaviorSettings {
   /** Whether to stream responses from the AI */
   stream: boolean;
-  /** Whether to generate text at cursor instead of end of file */
-  generateAtCursor: boolean;
-  /** Whether to automatically infer title after 4 messages have been exchanged */
-  autoInferTitle: boolean;
   /** Whether to disable the plugin's system message */
   disablePluginSystemMessage: boolean;
 }
@@ -46,8 +37,6 @@ export interface FormattingSettings {
   dateFormat: string;
   /** Heading level for messages */
   headingLevel: number;
-  /** Language to use for title inference */
-  inferTitleLanguage: string;
 }
 
 /**
@@ -95,14 +84,11 @@ export const DEFAULT_SETTINGS: ChatGPT_MDSettings = {
 
   // Chat Behavior
   stream: true,
-  generateAtCursor: false,
-  autoInferTitle: false,
   disablePluginSystemMessage: false,
 
   // Formatting
   dateFormat: DEFAULT_DATE_FORMAT,
   headingLevel: DEFAULT_HEADING_LEVEL,
-  inferTitleLanguage: DEFAULT_INFER_TITLE_LANGUAGE,
 
   // Templates
   defaultChatFrontmatter: DEFAULT_CHAT_FRONT_MATTER,

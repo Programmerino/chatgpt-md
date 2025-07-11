@@ -1,4 +1,4 @@
-import { App, MarkdownView, Notice, TFile, moment } from "obsidian";
+import { App, Notice, TFile, moment } from "obsidian";
 import { createFolderModal } from "src/Utilities/ModalHelpers";
 
 /**
@@ -6,34 +6,6 @@ import { createFolderModal } from "src/Utilities/ModalHelpers";
  */
 export class FileService {
   constructor(private app: App) {}
-
-  /**
-   * Write an inferred title to a file by renaming it
-   */
-  async writeInferredTitle(view: MarkdownView, title: string): Promise<void> {
-    const file = view.file;
-    if (!file) {
-      throw new Error("No file is currently open");
-    }
-
-    // Sanitize the title to remove invalid characters
-    const sanitizedTitle = this.sanitizeFileName(title);
-
-    const currentFolder = file.parent?.path ?? "/";
-    let newFileName = `${currentFolder}/${sanitizedTitle}.md`;
-
-    for (let i = 1; await this.app.vault.adapter.exists(newFileName); i++) {
-      newFileName = `${currentFolder}/${sanitizedTitle} (${i}).md`;
-    }
-
-    try {
-      await this.app.fileManager.renameFile(file, newFileName);
-    } catch (err) {
-      new Notice("[ChatGPT MD] Error writing inferred title to editor");
-      console.log("[ChatGPT MD] Error writing inferred title to editor", err);
-      throw err;
-    }
-  }
 
   /**
    * Create a new debug file with the given content and open it.

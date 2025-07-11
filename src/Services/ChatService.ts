@@ -1,11 +1,10 @@
 import { Editor, MarkdownView, Notice, Platform, TFile } from "obsidian";
 import { ServiceLocator } from "../core/ServiceLocator";
 import { SettingsService } from "./SettingsService";
-import { getHeadingPrefix, removeYAMLFrontMatter } from "../Utilities/TextHelpers";
+import { getHeadingPrefix } from "../Utilities/TextHelpers";
 import { HORIZONTAL_LINE_MD, ROLE_ASSISTANT, ROLE_USER } from "src/Constants";
 import { ApiAuthService } from "./ApiAuthService";
 import { MessageService } from "./MessageService";
-import { IAiApiService } from "./AiService";
 import { ChatGPT_MDSettings } from "src/Models/Config";
 import { EditorService } from "./EditorService";
 
@@ -63,7 +62,6 @@ export class ChatService {
         frontmatter,
         headingPrefix,
         editor,
-        editor ? settings.generateAtCursor : false,
         apiKeyToUse,
         settings,
         callbacks
@@ -86,23 +84,15 @@ export class ChatService {
       const editorService = this.serviceLocator.getEditorService();
       const settings = this.settingsService.getSettings();
       const frontmatter = await editorService.getFrontmatter(view.file, settings);
-      const { messagesWithRole, messages } = await editorService.getMessagesFromEditor(editor, settings);
+      const { messagesWithRole } = await editorService.getMessagesFromEditor(editor, settings);
 
-      if (!settings.generateAtCursor) {
-        editorService.moveCursorToEnd(editor);
-      }
+      editorService.moveCursorToEnd(editor);
 
       const response = await this._callAndProcessAI(view.file, messagesWithRole, frontmatter, settings, editor);
 
       // This is for editor-initiated chats. The full response is already streamed in.
       // We just need to add the next user prompt.
       editorService.processResponse(editor, response, settings);
-
-      if (response && !response.wasAborted) {
-        const updatedContent = editor.getValue();
-        const { messages: updatedMessages } = await editorService.getMessagesFromFileContent(updatedContent, settings);
-        await this.serviceLocator.getCommandRegistry().handleAutoTitleInference(view, frontmatter, updatedMessages);
-      }
     } catch (err) {
       if (err.name === "AbortError") {
         new Notice("Request cancelled.");
@@ -112,37 +102,6 @@ export class ChatService {
       }
     } finally {
       this.streaming = false;
-    }
-  }
-
-  public async inferTitle(editor: Editor, view: MarkdownView): Promise<void> {
-    if (!view.file) {
-      this.notificationService.showError("Cannot infer title without an active file.");
-      return;
-    }
-    const editorService = this.serviceLocator.getEditorService();
-    const settings = this.settingsService.getSettings();
-    const frontmatter = await editorService.getFrontmatter(view.file, settings);
-    const aiService = this.serviceLocator.getAiApiService();
-
-    if (!frontmatter.model) {
-      this.notificationService.showWarning("Model not set in frontmatter, using default.");
-      frontmatter.model = this.settingsService.getSettings().defaultChatFrontmatter;
-    }
-
-    this.notificationService.showStatusBarMessage(`Inferring title with ${frontmatter.model}...`, 0);
-
-    try {
-      const { messages } = await editorService.getMessagesFromEditor(editor, settings);
-      const configForTitleInference = { ...settings, ...frontmatter };
-      await aiService.inferTitle(view, configForTitleInference, messages, editorService);
-    } catch (error) {
-      if (error.name !== "AbortError") {
-        this.notificationService.showError("Failed to infer title. Check the console for details.");
-        console.error("[ChatGPT MD] Title inference error:", error);
-      }
-    } finally {
-      this.notificationService.clearStatusBar();
     }
   }
 
@@ -191,18 +150,6 @@ export class ChatService {
         );
         const fullResponseText = `${assistantHeader}${response.fullString}`;
         await vault.append(file, fullResponseText);
-
-        const activeView = this.serviceLocator.getApp().workspace.getActiveViewOfType(MarkdownView);
-        if (activeView && activeView.file?.path === file.path) {
-          const updatedContent = await vault.read(file);
-          const { messages: updatedMessages } = await editorService.getMessagesFromFileContent(
-            updatedContent,
-            settings
-          );
-          await this.serviceLocator
-            .getCommandRegistry()
-            .handleAutoTitleInference(activeView, frontmatter, updatedMessages);
-        }
       }
     } catch (err) {
       if (err.name === "AbortError") {
@@ -244,7 +191,7 @@ export class ChatService {
       const truncatedFileContent = `${
         frontmatter.trim() ? `${frontmatter.trim()}\n\n` : ""
       }${contentWithMessagesToKeep}`;
-      await vault.modify(file, truncatedFileContent);
+      await vault.process(file, () => truncatedFileContent);
 
       const response = await this._callAndProcessAI(
         file,
@@ -265,21 +212,8 @@ export class ChatService {
           ROLE_ASSISTANT,
           frontmatterData.model as string
         );
-        // FIX: The assistantHeader from getHeaderRole already includes the separator.
         const fullResponseText = `${assistantHeader}${response.fullString}`;
         await vault.append(file, fullResponseText);
-
-        const activeView = this.serviceLocator.getApp().workspace.getActiveViewOfType(MarkdownView);
-        if (activeView && activeView.file?.path === file.path) {
-          const updatedContent = await vault.read(file);
-          const { messages: updatedMessages } = await editorService.getMessagesFromFileContent(
-            updatedContent,
-            settings
-          );
-          await this.serviceLocator
-            .getCommandRegistry()
-            .handleAutoTitleInference(activeView, frontmatterData, updatedMessages);
-        }
       }
     } catch (err) {
       if (err.name === "AbortError") {
@@ -346,7 +280,8 @@ export class ChatService {
       throw new Error("File not provided to clearChat");
     }
     const { frontmatter } = await this.getFileContentParts(file);
-    await this.serviceLocator.getApp().vault.modify(file, frontmatter.trim() ? `${frontmatter.trim()}\n\n` : "");
+    const newContent = frontmatter.trim() ? `${frontmatter.trim()}\n\n` : "";
+    await this.serviceLocator.getApp().vault.process(file, () => newContent);
   }
 
   public async getFileContentParts(file: TFile): Promise<{ frontmatter: string; messageBlocks: string[] }> {
@@ -386,7 +321,7 @@ export class ChatService {
     const newContentJoined = messageBlocks.join(`\n\n${HORIZONTAL_LINE_MD}\n\n`);
     const newFileContent = `${frontmatter}\n\n${newContentJoined}`;
 
-    await this.serviceLocator.getApp().vault.modify(file, newFileContent);
+    await this.serviceLocator.getApp().vault.process(file, () => newFileContent);
   }
 
   public async deleteMessage(file: TFile, messageIndex: number): Promise<void> {
@@ -404,6 +339,6 @@ export class ChatService {
     const newContentJoined = messageBlocks.join(`\n\n${HORIZONTAL_LINE_MD}\n\n`);
     const newFileContent = `${frontmatter}${messageBlocks.length > 0 ? `\n\n${newContentJoined}` : ""}`;
 
-    await this.serviceLocator.getApp().vault.modify(file, newFileContent);
+    await this.serviceLocator.getApp().vault.process(file, () => newFileContent);
   }
 }

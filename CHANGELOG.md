@@ -1,5 +1,18 @@
 # ChatGPT MD Changelog
 
+## v2.6.0 (Upcoming) - Simplification & Core Focus
+
+### Major Refactoring
+- **Feature Simplification**: To improve stability and focus on the core chat experience, the following features have been removed:
+  - Title Inference (`Infer Title` command and automatic inference)
+  - `Add divider` command
+  - `Add comment block` command and comment parsing
+  - `Create new chat with highlighted text` command
+  - "Generate at cursor" setting (all responses now append to the end of the note)
+  - `Select Model` command (model can still be changed in frontmatter or sidebar)
+- **Codebase Health**: Refactored internal services to align with Obsidian API best practices, improving file handling safety and reducing complexity.
+- **API Handling**: Removed special filtering for AI models and citations to provide a more direct and unopinionated API experience.
+
 ## v2.2.0 (April 12, 2024) - Refactoring & Stability
 
 ### Feature Enhancements

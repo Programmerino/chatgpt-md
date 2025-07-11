@@ -17,7 +17,6 @@ import {
   escapeRegExp,
   unfinishedCodeBlock,
   extractRoleAndMessage,
-  removeCommentsFromMessages,
   splitMessages,
   removeYAMLFrontMatter,
 } from "../Utilities/TextHelpers";
@@ -69,8 +68,7 @@ export class MessageService {
    * Clean messages from the editor content
    */
   cleanMessages(content: string): string[] {
-    const messages = splitMessages(removeYAMLFrontMatter(content));
-    return messages.map((msg) => removeCommentsFromMessages(msg));
+    return splitMessages(removeYAMLFrontMatter(content));
   }
 
   /**
@@ -143,7 +141,7 @@ export class MessageService {
       })
     );
 
-    // Reconstruct the `messages` string array for backward compatibility (e.g., for title inference).
+    // Reconstruct the `messages` string array for backward compatibility.
     const messages = messagesWithRole.map((m) => m.content);
 
     return { messages, messagesWithRole };

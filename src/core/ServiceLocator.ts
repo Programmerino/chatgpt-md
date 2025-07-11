@@ -13,7 +13,6 @@ import { ApiAuthService } from "src/Services/ApiAuthService";
 import { ApiResponseParser } from "src/Services/ApiResponseParser";
 import { IAiApiService } from "src/Services/AiService";
 import { OpenAiService } from "src/Services/OpenAiService";
-import { AI_SERVICE_OPENAI } from "src/Constants";
 import { SettingsService } from "src/Services/SettingsService";
 import { ChatService } from "src/Services/ChatService";
 import { CommandRegistry } from "./CommandRegistry";
@@ -82,7 +81,7 @@ export class ServiceLocator {
     this.editorContentService = new EditorContentService(this.app);
     this.messageService = new MessageService(this.fileService, this.notificationService);
     this.frontmatterService = new FrontmatterService(this.app, this.frontmatterManager);
-    this.templateService = new TemplateService(this.app, this.fileService, this.editorContentService);
+    this.templateService = new TemplateService(this.app, this.fileService);
 
     // Initialize the EditorService with all specialized services
     this.editorService = new EditorService(

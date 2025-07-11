@@ -10,7 +10,6 @@ interface StreamCallbacks {
 
 export class ApiResponseParser {
   private notificationService: NotificationService;
-  private collectedCitations: Set<string> = new Set();
 
   constructor(notificationService?: NotificationService) {
     this.notificationService = notificationService || new NotificationService();
@@ -37,11 +36,6 @@ export class ApiResponseParser {
       if (payloadString === "[DONE]") return null;
 
       const json = JSON.parse(payloadString);
-
-      if (json.citations) {
-        json.citations.forEach((c: string) => this.collectedCitations.add(c));
-      }
-
       return json.choices?.[0]?.delta?.content ?? null;
     } catch (e) {
       return null;
@@ -92,20 +86,6 @@ export class ApiResponseParser {
         currentInsertPosition = calculateEndPosition(currentInsertPosition, finalChunk);
       }
       callbacks?.onChunk(finalChunk);
-    }
-
-    if (this.collectedCitations.size > 0) {
-      const citations = Array.from(this.collectedCitations)
-        .map((c, i) => `${i + 1}. [${c}](${c})`)
-        .join("\n");
-      const citationsText = `\n\n**Sources:**\n${citations}`;
-      text += citationsText;
-      if (editor && currentInsertPosition) {
-        editor.replaceRange(citationsText, currentInsertPosition);
-        currentInsertPosition = calculateEndPosition(currentInsertPosition, citationsText);
-      }
-      callbacks?.onChunk(citationsText);
-      this.collectedCitations.clear();
     }
 
     callbacks?.onDone(text);

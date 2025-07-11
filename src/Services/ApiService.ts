@@ -1,4 +1,4 @@
-import { App, Platform, requestUrl } from "obsidian";
+import { App, requestUrl } from "obsidian";
 import { ApiAuthService } from "./ApiAuthService";
 import { ApiResponseParser } from "./ApiResponseParser";
 import { ErrorService } from "./ErrorService";
@@ -33,7 +33,7 @@ export class ApiService {
    * @param url The API endpoint URL
    * @param payload The request payload
    * @param headers The request headers
-   * @param serviceType The AI service type (openai, openrouter, ollama)
+   * @param serviceType The AI service type (e.g., openai)
    * @returns A Response object for streaming
    */
   async makeStreamingRequest(
@@ -42,8 +42,11 @@ export class ApiService {
     headers: Record<string, string>,
     serviceType: string
   ): Promise<Response> {
+    // We use `fetch` directly for streaming, as `requestUrl` from the Obsidian API
+    // does not support reading from a stream. This is a necessary deviation from
+    // the plugin guidelines to enable real-time response updates. This implementation
+    // includes an AbortController to ensure requests can be cancelled.
     this.abortController = new AbortController();
-    console.log("[ChatGPT MD] Created new AbortController for streaming request.");
 
     try {
       const response = await fetch(url, {
@@ -76,7 +79,7 @@ export class ApiService {
    * @param url The API endpoint URL
    * @param payload The request payload
    * @param headers The request headers
-   * @param serviceType The AI service type (openai, openrouter, ollama)
+   * @param serviceType The AI service type
    * @returns The parsed response data
    */
   async makeNonStreamingRequest(
@@ -86,7 +89,6 @@ export class ApiService {
     serviceType: string
   ): Promise<any> {
     this.abortController = new AbortController();
-    console.log("[ChatGPT MD] Created new AbortController for non-streaming request.");
 
     try {
       const response = await fetch(url, {
@@ -109,7 +111,6 @@ export class ApiService {
       }
       return this.handleRequestError(error, serviceType, payload, url);
     } finally {
-      // Ensure the controller is cleaned up after the request is complete or fails.
       this.abortController = null;
     }
   }
@@ -118,7 +119,7 @@ export class ApiService {
    * Make a GET request to fetch data
    * @param url The API endpoint URL
    * @param headers The request headers
-   * @param serviceType The AI service type (openai, openrouter, ollama)
+   * @param serviceType The AI service type
    * @returns The parsed response data
    */
   async makeGetRequest(url: string, headers: Record<string, string>, serviceType: string): Promise<any> {

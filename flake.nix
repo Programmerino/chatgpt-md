@@ -19,7 +19,7 @@
 
         chatgpt-md = pkgs.stdenv.mkDerivation rec {
           pname = "obsidian-chatgpt-md";
-          version = "2.5.0";
+          version = "2.6.0";
 
           src = lib.cleanSource self;
 

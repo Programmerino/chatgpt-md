@@ -36,8 +36,6 @@ Start chatting, don't worry too much about the more advanced features. They will
   * Enjoy full rendering of lists, code blocks, and more from all responses.
 * **Minimal Setup:**
   * Simply provide your OpenAI API key to get started.
-* **Comment Blocks:**
-  * Ignore parts of your notes using comment blocks.
 * **Chat Templates**:
   * Use and share frontmatter templates for recurring scenarios.
 
@@ -52,7 +50,7 @@ You can change the global settings or use local parameters in any note via front
 ```
 ---
 system_commands: ['I am a helpful assistant.']
-model: gpt-4.1-mini
+model: gpt-4o-mini
 stream: true
 ---
 ```
@@ -66,13 +64,12 @@ Run commands from Obsidian's command pallet via `cmd + p` or `ctrl + p` and star
 - **Toggle Chat Sidebar**: Opens or closes the new dedicated chat interface in the right sidebar.
 
 #### Creation Commands
-- **New Chat with Highlighted Text**: Start a chat using highlighted text and default frontmatter.
 - **New Chat From Template**: Create chats from templates.
 
 #### Utility Commands
-- **Infer Title**: Automatically generate a note title based on the note's content.
-- **Add Comment Block**: Insert comment blocks for parts of your note that should be ignored.
-- **Select Model**: Choose from available OpenAI models and set the current model for your note.
+- **Clear Chat**: Clears the conversation history from the current note, preserving only the frontmatter.
+- **Stop AI Generation**: Force-stops any in-progress response from the AI.
+- **Debug: Create Request Note**: Creates a new note containing the raw API request payload for debugging purposes.
 
 ## Contributions Welcome 🤝
 Pull requests, bug reports, and all other forms of contribution are welcomed and highly encouraged!* :octocat:

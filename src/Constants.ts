@@ -6,12 +6,8 @@ export const API_ENDPOINTS = {
   [AI_SERVICE_OPENAI]: "/v1/chat/completions",
 };
 
-export const ADD_COMMENT_BLOCK_COMMAND_ID = "add-comment-block";
-export const ADD_HR_COMMAND_ID = "add-hr";
 export const CALL_CHATGPT_API_COMMAND_ID = "call-chatgpt-api";
 export const STOP_GENERATING_COMMAND_ID = "stop-generating";
-export const MOVE_TO_CHAT_COMMAND_ID = "move-to-chat";
-export const INFER_TITLE_COMMAND_ID = "infer-title";
 export const CHOOSE_CHAT_TEMPLATE_COMMAND_ID = "choose-chat-template";
 export const CLEAR_CHAT_COMMAND_ID = "clear-chat";
 export const DEBUG_REQUEST_COMMAND_ID = "debug-create-request-note";
@@ -33,13 +29,8 @@ export const NEWLINE = "\n\n";
 export const WIKI_LINKS_REGEX = /\[\[([^\][]+)\]\]/g;
 export const MARKDOWN_LINKS_REGEX = /\[([^\]]+)\]\(([^()]+)\)/g;
 
-export const COMMENT_BLOCK_START = `=begin-chatgpt-md-comment${NEWLINE}`;
-export const COMMENT_BLOCK_END = `=end-chatgpt-md-comment`;
-
 export const DEFAULT_HEADING_LEVEL = 3;
 export const MAX_HEADING_LEVEL = 6;
-export const DEFAULT_INFER_TITLE_LANGUAGE = "English";
-export const MIN_AUTO_INFER_MESSAGES = 4;
 export const DEFAULT_DATE_FORMAT = "YYYYMMDDhhmmss";
 
 export const ERROR_NO_CONNECTION = "Failed to fetch";

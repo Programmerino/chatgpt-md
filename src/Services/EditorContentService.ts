@@ -1,7 +1,5 @@
 import { App, Editor, MarkdownView } from "obsidian";
-import { getHeaderRole, getHeadingPrefix } from "src/Utilities/TextHelpers";
 import { FrontmatterManager } from "src/Services/FrontmatterManager";
-import { HORIZONTAL_LINE_MD, NEWLINE, ROLE_ASSISTANT, ROLE_IDENTIFIER, ROLE_USER } from "src/Constants";
 
 /**
  * Service responsible for editor content manipulation
@@ -13,30 +11,6 @@ export class EditorContentService {
     if (app) {
       this.frontmatterManager = new FrontmatterManager(app);
     }
-  }
-  /**
-   * Add a horizontal rule with a role header
-   */
-  addHorizontalRule(editor: Editor, role: string, headingLevel: number): void {
-    const formattedContent = `${NEWLINE}${HORIZONTAL_LINE_MD}${NEWLINE}${getHeadingPrefix(
-      headingLevel
-    )}${ROLE_IDENTIFIER}${role}${NEWLINE}`;
-
-    const currentPosition = editor.getCursor();
-
-    editor.replaceRange(formattedContent, currentPosition);
-    editor.setCursor(currentPosition.line + formattedContent.split("\n").length - 1, 0);
-  }
-
-  /**
-   * Append a message to the editor
-   */
-  appendMessage(editor: Editor, message: string, headingLevel: number): void {
-    const headingPrefix = getHeadingPrefix(headingLevel);
-    const assistantRoleHeader = getHeaderRole(headingPrefix, ROLE_ASSISTANT);
-    const userRoleHeader = getHeaderRole(headingPrefix, ROLE_USER);
-
-    editor.replaceRange(`${assistantRoleHeader}${message}${userRoleHeader}`, editor.getCursor());
   }
 
   /**
@@ -82,21 +56,5 @@ export class EditorContentService {
     } catch (err) {
       throw new Error("Error moving cursor to end of file" + err);
     }
-  }
-
-  /**
-   * Add a comment block at the cursor position
-   */
-  addCommentBlock(editor: Editor, commentStart: string, commentEnd: string): void {
-    const cursor = editor.getCursor();
-    const commentBlock = `${commentStart}${NEWLINE}${commentEnd}`;
-
-    editor.replaceRange(commentBlock, cursor);
-
-    // Move cursor to middle of comment block
-    editor.setCursor({
-      line: cursor.line + 1,
-      ch: cursor.ch,
-    });
   }
 }

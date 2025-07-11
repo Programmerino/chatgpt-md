@@ -1,4 +1,4 @@
-import { App, Editor, Platform } from "obsidian";
+import { App, Editor } from "obsidian";
 import { Message } from "src/Models/Message";
 import { AI_SERVICE_OPENAI, ROLE_SYSTEM } from "src/Constants";
 import { BaseAiService, IAiApiService, OpenAiModel, StreamCallbacks } from "./AiService";
@@ -32,22 +32,8 @@ export const fetchAvailableOpenAiModels = async (app: App, url: string, apiKey: 
 
     const models = await apiService.makeGetRequest(`${url}/v1/models`, headers, AI_SERVICE_OPENAI);
 
-    return models.data
-      .filter(
-        (model: OpenAiModel) =>
-          !model.id.includes("vision") &&
-          !model.id.includes("dalle") &&
-          !model.id.includes("audio") &&
-          !model.id.includes("transcribe") &&
-          !model.id.includes("realtime") &&
-          !model.id.includes("tts")
-      )
-      .sort((a: OpenAiModel, b: OpenAiModel) => {
-        if (a.id < b.id) return 1;
-        if (a.id > b.id) return -1;
-        return 0;
-      })
-      .map((model: OpenAiModel) => model.id);
+    // Return all model IDs, sorted alphabetically
+    return models.data.map((model: OpenAiModel) => model.id).sort((a: string, b: string) => a.localeCompare(b));
   } catch (error) {
     console.error("Error fetching OpenAI models:", error);
     return [];
@@ -84,16 +70,11 @@ export class OpenAiService extends BaseAiService implements IAiApiService {
       stream: !!config.stream,
     };
 
-    const isRestrictedModel = modelName.includes("search");
-
     if (config.max_tokens !== undefined) payload.max_tokens = config.max_tokens as number;
-
-    if (!isRestrictedModel) {
-      if (config.temperature !== undefined) payload.temperature = config.temperature as number;
-      if (config.top_p !== undefined) payload.top_p = config.top_p as number;
-      if (config.presence_penalty !== undefined) payload.presence_penalty = config.presence_penalty as number;
-      if (config.frequency_penalty !== undefined) payload.frequency_penalty = config.frequency_penalty as number;
-    }
+    if (config.temperature !== undefined) payload.temperature = config.temperature as number;
+    if (config.top_p !== undefined) payload.top_p = config.top_p as number;
+    if (config.presence_penalty !== undefined) payload.presence_penalty = config.presence_penalty as number;
+    if (config.frequency_penalty !== undefined) payload.frequency_penalty = config.frequency_penalty as number;
 
     return payload;
   }
@@ -104,22 +85,10 @@ export class OpenAiService extends BaseAiService implements IAiApiService {
     config: Record<string, unknown>,
     editor: Editor | undefined,
     headingPrefix: string,
-    setAtCursor?: boolean | undefined,
     settings?: ChatGPT_MDSettings,
     callbacks?: StreamCallbacks
   ): Promise<{ fullString: string; mode: "streaming"; wasAborted?: boolean }> {
-    // Unify behavior across platforms by using the default streaming implementation for all.
-    // This ensures that cancellation works on mobile as well.
-    return this.defaultCallStreamingAPI(
-      apiKey,
-      messages,
-      config,
-      editor,
-      headingPrefix,
-      setAtCursor,
-      settings,
-      callbacks
-    );
+    return this.defaultCallStreamingAPI(apiKey, messages, config, editor, headingPrefix, settings, callbacks);
   }
 
   protected async callNonStreamingAPI(
@@ -129,10 +98,6 @@ export class OpenAiService extends BaseAiService implements IAiApiService {
     settings?: ChatGPT_MDSettings
   ): Promise<any> {
     return this.defaultCallNonStreamingAPI(apiKey, messages, config, settings);
-  }
-
-  protected showNoTitleInferredNotification(): void {
-    this.notificationService.showWarning("Could not infer title. The file name was not changed.");
   }
 }
 

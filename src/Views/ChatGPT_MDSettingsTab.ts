@@ -7,7 +7,7 @@ interface SettingDefinition {
   id: keyof ChatGPT_MDSettings;
   name: string;
   description: string;
-  type: "text" | "textarea" | "toggle" | "dropdown";
+  type: "text" | "textarea" | "toggle";
   placeholder?: string;
   options?: Record<string, string>;
   group: string;
@@ -64,20 +64,6 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
         group: "Chat Behavior",
       },
       {
-        id: "generateAtCursor",
-        name: "Generate at Cursor",
-        description: "Generate text at cursor instead of end of file",
-        type: "toggle",
-        group: "Chat Behavior",
-      },
-      {
-        id: "autoInferTitle",
-        name: "Automatically Infer Title",
-        description: "Automatically infer title after 4 messages have been exchanged",
-        type: "toggle",
-        group: "Chat Behavior",
-      },
-      {
         id: "disablePluginSystemMessage",
         name: "Disable Plugin System Message",
         description: "If enabled, the plugin's system message will not be added to your prompts.",
@@ -112,24 +98,6 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
         name: "Heading Level",
         description: `Heading level for messages (example for heading level 2: '## ${ROLE_IDENTIFIER}${ROLE_USER}'). Valid heading levels are from 0 to 6.`,
         type: "text",
-        group: "Formatting",
-      },
-      {
-        id: "inferTitleLanguage",
-        name: "Infer title language",
-        description: "Language to use for title inference.",
-        type: "dropdown",
-        options: {
-          English: "English",
-          Japanese: "Japanese",
-          Spanish: "Spanish",
-          French: "French",
-          German: "German",
-          Chinese: "Chinese",
-          Korean: "Korean",
-          Italian: "Italian",
-          Russian: "Russian",
-        },
         group: "Formatting",
       },
     ];
@@ -187,16 +155,6 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
           await this.settingsProvider.saveSettings();
         })
       );
-    } else if (schema.type === "dropdown" && schema.options) {
-      setting.addDropdown((dropdown) => {
-        dropdown.addOptions(schema.options || {});
-        dropdown.setValue(String(this.settingsProvider.settings[schema.id]));
-        dropdown.onChange(async (value) => {
-          (this.settingsProvider.settings[schema.id] as string) = value;
-          await this.settingsProvider.saveSettings();
-        });
-        dropdown.selectEl.style.width = "300px";
-      });
     }
   }
 }
