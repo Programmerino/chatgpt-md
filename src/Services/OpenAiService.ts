@@ -1,4 +1,4 @@
-import { App, Editor } from "obsidian";
+import { App, Editor, Platform } from "obsidian";
 import { Message } from "src/Models/Message";
 import { AI_SERVICE_OPENAI, ROLE_SYSTEM } from "src/Constants";
 import { BaseAiService, IAiApiService, OpenAiModel, StreamCallbacks } from "./AiService";
@@ -112,6 +112,16 @@ export class OpenAiService extends BaseAiService implements IAiApiService {
     settings?: ChatGPT_MDSettings,
     callbacks?: StreamCallbacks
   ): Promise<{ fullString: string; mode: "streaming"; wasAborted?: boolean }> {
+    if (Platform.isMobile) {
+      // Fallback to non-streaming on mobile as fetch-based streaming is unreliable
+      const response = await this.callNonStreamingAPI(apiKey, messages, config, settings);
+      return {
+        fullString: response.fullString,
+        mode: "streaming", // Keep mode as streaming for the caller
+        wasAborted: false,
+      };
+    }
+
     return this.defaultCallStreamingAPI(
       apiKey,
       messages,

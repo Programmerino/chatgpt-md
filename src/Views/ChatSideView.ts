@@ -177,7 +177,14 @@ export class ChatSideView extends ItemView {
     this.headerEl.empty();
     this.headerEl.createEl("span", { text: title, cls: "chat-view-title" });
     if (this.currentChatFile) {
-      this.paramsToggleBtn = this.headerEl.createEl("button", { cls: "chat-view-params-toggle" });
+      const actionsContainer = this.headerEl.createDiv({ cls: "chat-view-header-actions" });
+
+      const clearButton = actionsContainer.createEl("button", { cls: "chat-view-params-toggle" });
+      setIcon(clearButton, "trash");
+      clearButton.setAttribute("aria-label", "Clear chat history");
+      clearButton.onclick = () => this.handleClearChat();
+
+      this.paramsToggleBtn = actionsContainer.createEl("button", { cls: "chat-view-params-toggle" });
       setIcon(this.paramsToggleBtn, "settings-2");
       this.paramsToggleBtn.setAttribute("aria-label", "View & edit chat parameters");
       this.paramsToggleBtn.onclick = () => {
@@ -380,7 +387,11 @@ export class ChatSideView extends ItemView {
   }
 
   private async handleDelete(messageEl: HTMLElement, index: number) {
-    const confirmed = await this.confirmDelete();
+    const confirmed = await this.confirmAction(
+      "Delete Message",
+      "Are you sure you want to delete this message? This action cannot be undone.",
+      "Delete"
+    );
     if (confirmed && this.currentChatFile) {
       try {
         await this.chatService.deleteMessage(this.currentChatFile, index);
@@ -394,15 +405,35 @@ export class ChatSideView extends ItemView {
     }
   }
 
-  private confirmDelete(): Promise<boolean> {
+  private async handleClearChat() {
+    if (!this.currentChatFile) return;
+
+    const confirmed = await this.confirmAction(
+      "Clear Chat History",
+      "Are you sure you want to clear all messages in this chat? This action cannot be undone.",
+      "Clear"
+    );
+    if (confirmed) {
+      try {
+        await this.chatService.clearChatHistory(this.currentChatFile);
+        new Notice("Chat cleared.");
+        this.scheduleUpdate();
+      } catch (error) {
+        new Notice("Failed to clear chat.");
+        console.error(error);
+      }
+    }
+  }
+
+  private confirmAction(title: string, message: string, cta: string): Promise<boolean> {
     return new Promise((resolve) => {
       const modal = new Modal(this.app);
-      modal.titleEl.setText("Delete Message");
-      modal.contentEl.setText("Are you sure you want to delete this message? This action cannot be undone.");
+      modal.titleEl.setText(title);
+      modal.contentEl.setText(message);
       new Setting(modal.contentEl)
         .addButton((btn) =>
           btn
-            .setButtonText("Delete")
+            .setButtonText(cta)
             .setWarning()
             .onClick(() => {
               modal.close();
