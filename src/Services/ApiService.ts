@@ -88,55 +88,38 @@ export class ApiService {
     headers: Record<string, string>,
     serviceType: string
   ): Promise<any> {
-    this.abortController = new AbortController();
-    console.log("[ChatGPT MD] Created new AbortController for non-streaming request.");
+    // Use requestUrl for both mobile and desktop for consistency and to follow Obsidian guidelines.
+    // Note: requestUrl does not support AbortController, so non-streaming requests are not cancellable.
+    try {
+      const responseUrl = await requestUrl({
+        url,
+        method: "POST",
+        headers,
+        contentType: "application/json",
+        body: JSON.stringify(payload),
+        throw: false,
+      });
 
-    if (!Platform.isMobile) {
-      try {
-        const response = await fetch(url, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(payload),
-          signal: this.abortController.signal,
-        });
-
-        if (!response.ok) {
-          throw await this.handleHttpError(response, serviceType, payload, url);
-        }
-
-        const data = await response.json();
-        return this.apiResponseParser.parseNonStreamingResponse(data, serviceType);
-      } catch (error) {
-        if (error.name === "AbortError") {
-          console.log("[ChatGPT MD] Non-streaming fetch() was aborted.");
-          throw error;
-        }
-        return this.handleRequestError(error, serviceType, payload, url);
-      }
-    } else {
-      // Mobile uses requestUrl which is not abortable.
-      try {
-        const responseUrl = await requestUrl({
-          url,
-          method: "POST",
-          headers,
-          contentType: "application/json",
-          body: JSON.stringify(payload),
-          throw: false,
-        });
-
-        if (responseUrl.status >= 400) {
-          throw await this.handleHttpError(responseUrl as any, serviceType, payload, url);
-        }
-
-        return this.apiResponseParser.parseNonStreamingResponse(responseUrl.json, serviceType);
-      } catch (error) {
-        return this.errorService.handleApiError(error, serviceType, {
-          returnForChat: true,
+      if (responseUrl.status >= 400) {
+        // handleApiError will throw an error, which will be caught by the catch block.
+        this.errorService.handleApiError(responseUrl.json, serviceType, {
+          returnForChat: false, // This will cause it to throw
           showNotification: true,
-          context: { model: payload.model, url },
+          context: { model: payload.model, url, status: responseUrl.status },
         });
       }
+
+      return this.apiResponseParser.parseNonStreamingResponse(responseUrl.json, serviceType);
+    } catch (error) {
+      if (error.name === "AbortError") {
+        throw error; // Propagate abort errors
+      }
+      // Catch errors from requestUrl itself or from handleApiError
+      return this.errorService.handleApiError(error, serviceType, {
+        returnForChat: true, // This will return a user-friendly string
+        showNotification: true,
+        context: { model: payload.model, url },
+      });
     }
   }
 

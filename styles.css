@@ -15,12 +15,6 @@
   flex-shrink: 0;
 }
 
-.chat-view-header-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--size-4-1);
-}
-
 .chat-view-title {
   font-weight: var(--font-semibold);
   white-space: nowrap;
@@ -29,7 +23,13 @@
   margin-right: var(--size-4-2);
 }
 
-.chat-view-params-toggle {
+.chat-view-header-actions {
+  display: flex;
+  gap: var(--size-4-1);
+}
+
+.chat-view-params-toggle,
+.chat-view-action-button {
   background: none;
   border: none;
   cursor: pointer;
@@ -39,7 +39,8 @@
   flex-shrink: 0;
 }
 
-.chat-view-params-toggle:hover {
+.chat-view-params-toggle:hover,
+.chat-view-action-button:hover {
   background-color: var(--background-modifier-hover);
   color: var(--icon-color-hover);
 }

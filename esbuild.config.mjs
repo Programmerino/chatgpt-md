@@ -54,7 +54,7 @@ const context = await esbuild.context({
     keepNames: false, // Allow name mangling for smaller bundles
 
     // Platform-specific optimizations
-    platform: "node",
+    platform: "browser",
 
     // Bundle analysis
     metafile: analyze,

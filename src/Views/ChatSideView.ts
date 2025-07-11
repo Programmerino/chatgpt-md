@@ -176,15 +176,16 @@ export class ChatSideView extends ItemView {
   private updateHeader(title: string) {
     this.headerEl.empty();
     this.headerEl.createEl("span", { text: title, cls: "chat-view-title" });
+
     if (this.currentChatFile) {
-      const actionsContainer = this.headerEl.createDiv({ cls: "chat-view-header-actions" });
+      const headerActions = this.headerEl.createDiv({ cls: "chat-view-header-actions" });
 
-      const clearButton = actionsContainer.createEl("button", { cls: "chat-view-params-toggle" });
-      setIcon(clearButton, "trash");
-      clearButton.setAttribute("aria-label", "Clear chat history");
-      clearButton.onclick = () => this.handleClearChat();
+      const clearChatBtn = headerActions.createEl("button", { cls: "chat-view-action-button" });
+      setIcon(clearChatBtn, "trash-2");
+      clearChatBtn.setAttribute("aria-label", "Clear all messages");
+      clearChatBtn.onclick = () => this.handleClearChat();
 
-      this.paramsToggleBtn = actionsContainer.createEl("button", { cls: "chat-view-params-toggle" });
+      this.paramsToggleBtn = headerActions.createEl("button", { cls: "chat-view-params-toggle" });
       setIcon(this.paramsToggleBtn, "settings-2");
       this.paramsToggleBtn.setAttribute("aria-label", "View & edit chat parameters");
       this.paramsToggleBtn.onclick = () => {
@@ -387,11 +388,7 @@ export class ChatSideView extends ItemView {
   }
 
   private async handleDelete(messageEl: HTMLElement, index: number) {
-    const confirmed = await this.confirmAction(
-      "Delete Message",
-      "Are you sure you want to delete this message? This action cannot be undone.",
-      "Delete"
-    );
+    const confirmed = await this.confirmDelete();
     if (confirmed && this.currentChatFile) {
       try {
         await this.chatService.deleteMessage(this.currentChatFile, index);
@@ -405,19 +402,15 @@ export class ChatSideView extends ItemView {
     }
   }
 
-  private async handleClearChat() {
+  private async handleClearChat(): Promise<void> {
     if (!this.currentChatFile) return;
 
-    const confirmed = await this.confirmAction(
-      "Clear Chat History",
-      "Are you sure you want to clear all messages in this chat? This action cannot be undone.",
-      "Clear"
-    );
+    const confirmed = await this.confirmClear();
     if (confirmed) {
       try {
-        await this.chatService.clearChatHistory(this.currentChatFile);
+        await this.chatService.clearChat(this.currentChatFile);
         new Notice("Chat cleared.");
-        this.scheduleUpdate();
+        this.scheduleUpdate(); // This will re-render the empty chat.
       } catch (error) {
         new Notice("Failed to clear chat.");
         console.error(error);
@@ -425,15 +418,42 @@ export class ChatSideView extends ItemView {
     }
   }
 
-  private confirmAction(title: string, message: string, cta: string): Promise<boolean> {
+  private confirmClear(): Promise<boolean> {
     return new Promise((resolve) => {
       const modal = new Modal(this.app);
-      modal.titleEl.setText(title);
-      modal.contentEl.setText(message);
+      modal.titleEl.setText("Clear Chat");
+      modal.contentEl.setText(
+        "Are you sure you want to delete all messages in this chat? This action cannot be undone."
+      );
       new Setting(modal.contentEl)
         .addButton((btn) =>
           btn
-            .setButtonText(cta)
+            .setButtonText("Clear Chat")
+            .setWarning()
+            .onClick(() => {
+              modal.close();
+              resolve(true);
+            })
+        )
+        .addButton((btn) =>
+          btn.setButtonText("Cancel").onClick(() => {
+            modal.close();
+            resolve(false);
+          })
+        );
+      modal.open();
+    });
+  }
+
+  private confirmDelete(): Promise<boolean> {
+    return new Promise((resolve) => {
+      const modal = new Modal(this.app);
+      modal.titleEl.setText("Delete Message");
+      modal.contentEl.setText("Are you sure you want to delete this message? This action cannot be undone.");
+      new Setting(modal.contentEl)
+        .addButton((btn) =>
+          btn
+            .setButtonText("Delete")
             .setWarning()
             .onClick(() => {
               modal.close();

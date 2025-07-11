@@ -42,20 +42,6 @@ export class SettingsService {
     // Define migrations as an array of objects with version information
     const settingsMigrations: SettingsMigration[] = [
       {
-        setting: "ollamaUrl",
-        pattern: /\/api\/$/,
-        replacement: "",
-        description: "Removing trailing /api/ from Ollama URL",
-        introducedIn: "2.1.3",
-      },
-      {
-        setting: "openrouterUrl",
-        pattern: /\/api\/$/,
-        replacement: "",
-        description: "Removing trailing /api/ from OpenRouter URL",
-        introducedIn: "2.1.3",
-      },
-      {
         setting: "openaiUrl",
         pattern: /\/$/,
         replacement: "",

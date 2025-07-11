@@ -205,82 +205,69 @@ export class ChatService {
     }
   }
 
-  public async clearChatHistory(file: TFile): Promise<void> {
-    const fileCache = this.serviceLocator.getApp().metadataCache.getFileCache(file);
-
-    if (!fileCache) {
-      await this.serviceLocator.getApp().vault.modify(file, "");
-      return;
+  public async clearChat(file: TFile): Promise<void> {
+    if (!file) {
+      throw new Error("File not provided to clearChat");
     }
+    const { frontmatter } = await this.getFileContentParts(file);
+    await this.serviceLocator.getApp().vault.modify(file, frontmatter.trim() ? `${frontmatter.trim()}\n\n` : "");
+  }
 
-    const frontmatterPos = fileCache.frontmatterPosition;
+  private async getFileContentParts(file: TFile): Promise<{ frontmatter: string; messageBlocks: string[] }> {
+    const fileContent = await this.serviceLocator.getApp().vault.read(file);
+    const fileCache = this.serviceLocator.getApp().metadataCache.getFileCache(file);
+    const frontmatterEndOffset = fileCache?.frontmatterPosition?.end.offset ?? 0;
 
-    await this.serviceLocator.getApp().vault.process(file, (data) => {
-      if (frontmatterPos) {
-        const frontmatterString = data.substring(frontmatterPos.start.offset, frontmatterPos.end.offset);
-        return frontmatterString + "\n";
-      }
-      return "";
-    });
+    const frontmatter = fileContent.substring(0, frontmatterEndOffset);
+    const content = fileContent.substring(frontmatterEndOffset).trim();
+
+    const messageBlocks = content ? content.split(new RegExp(`\\n*${HORIZONTAL_LINE_MD}\\n*`)) : [];
+
+    return { frontmatter, messageBlocks: messageBlocks.filter(Boolean) };
   }
 
   public async updateMessage(file: TFile, messageIndex: number, newContent: string): Promise<void> {
-    const fileCache = this.serviceLocator.getApp().metadataCache.getFileCache(file);
-    const frontmatterEndOffset = fileCache?.frontmatterPosition?.end.offset ?? 0;
+    const { frontmatter, messageBlocks } = await this.getFileContentParts(file);
 
-    await this.serviceLocator.getApp().vault.process(file, (data) => {
-      const frontmatter = data.substring(0, frontmatterEndOffset);
-      const content = data.substring(frontmatterEndOffset).trim();
+    if (messageIndex < 0 || messageIndex >= messageBlocks.length) {
+      console.error(
+        `[ChatGPT MD] Update failed: Invalid message index ${messageIndex} for ${messageBlocks.length} messages.`
+      );
+      throw new Error("Invalid message index.");
+    }
 
-      const messageBlocks = content ? content.split(new RegExp(`\\n*${HORIZONTAL_LINE_MD}\\n*`)) : [];
+    const originalMessageBlock = messageBlocks[messageIndex];
+    const headerMatch = originalMessageBlock.match(/^#+\s*role::[\s\S]*?\n\n/m);
 
-      if (messageIndex < 0 || messageIndex >= messageBlocks.length) {
-        console.error(
-          `[ChatGPT MD] Update failed: Invalid message index ${messageIndex} for ${messageBlocks.length} messages.`
-        );
-        return data;
-      }
+    if (!headerMatch) {
+      console.error("[ChatGPT MD] Could not find message header in block:", originalMessageBlock);
+      throw new Error("Could not preserve message header during edit.");
+    }
 
-      const originalMessageBlock = messageBlocks[messageIndex];
-      const headerMatch = originalMessageBlock.match(/^#+\s*role::[\s\S]*?\n\n/m);
+    const header = headerMatch[0];
+    messageBlocks[messageIndex] = `${header.trim()}\n\n${newContent.trim()}`;
 
-      if (!headerMatch) {
-        console.error("[ChatGPT MD] Could not find message header in block:", originalMessageBlock);
-        return data;
-      }
+    const newContentJoined = messageBlocks.join(`\n\n${HORIZONTAL_LINE_MD}\n\n`);
+    const newFileContent = `${frontmatter}\n\n${newContentJoined}`;
 
-      const header = headerMatch[0];
-      messageBlocks[messageIndex] = `${header.trim()}\n\n${newContent.trim()}`;
-
-      const newContentJoined = messageBlocks.join(`\n\n${HORIZONTAL_LINE_MD}\n\n`);
-      const newFileContent = `${frontmatter}\n\n${newContentJoined}`;
-
-      return newFileContent;
-    });
+    await this.serviceLocator.getApp().vault.modify(file, newFileContent);
   }
 
   public async deleteMessage(file: TFile, messageIndex: number): Promise<void> {
-    const fileCache = this.serviceLocator.getApp().metadataCache.getFileCache(file);
-    const frontmatterEndOffset = fileCache?.frontmatterPosition?.end.offset ?? 0;
+    const { frontmatter, messageBlocks } = await this.getFileContentParts(file);
 
-    await this.serviceLocator.getApp().vault.process(file, (data) => {
-      const frontmatter = data.substring(0, frontmatterEndOffset);
-      const content = data.substring(frontmatterEndOffset).trim();
+    if (messageIndex < 0 || messageIndex >= messageBlocks.length) {
+      console.error(
+        `[ChatGPT MD] Delete failed: Invalid message index ${messageIndex} for ${messageBlocks.length} messages.`
+      );
+      throw new Error("Invalid message index.");
+    }
 
-      const messageBlocks = content ? content.split(new RegExp(`\\n*${HORIZONTAL_LINE_MD}\\n*`)) : [];
+    messageBlocks.splice(messageIndex, 1);
 
-      if (messageIndex < 0 || messageIndex >= messageBlocks.length) {
-        console.error(
-          `[ChatGPT MD] Delete failed: Invalid message index ${messageIndex} for ${messageBlocks.length} messages.`
-        );
-        return data;
-      }
+    const newContentJoined = messageBlocks.join(`\n\n${HORIZONTAL_LINE_MD}\n\n`);
+    const newFileContent = `${frontmatter}${messageBlocks.length > 0 ? `\n\n${newContentJoined}` : ""}`;
 
-      messageBlocks.splice(messageIndex, 1);
-
-      const newContentJoined = messageBlocks.join(`\n\n${HORIZONTAL_LINE_MD}\n\n`);
-      const newFileContent = `${frontmatter}${messageBlocks.length > 0 ? `\n\n${newContentJoined}` : ""}`;
-      return newFileContent;
-    });
+    await this.serviceLocator.getApp().vault.modify(file, newFileContent);
   }
 }
