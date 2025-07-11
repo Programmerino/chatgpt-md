@@ -81,7 +81,7 @@ export class CommandRegistry {
     }
 
     try {
-      const aiServiceForTitle = this.serviceLocator.getAiApiService(frontmatter.aiService);
+      const aiServiceForTitle = this.serviceLocator.getAiApiService();
       const titleInferenceConfig = { ...settings, ...frontmatter };
 
       if (!titleInferenceConfig.model) {
@@ -173,7 +173,7 @@ export class CommandRegistry {
 
         try {
           const frontmatter = await editorService.getFrontmatter(view.file, settings);
-          const aiService = this.serviceLocator.getAiApiService(AI_SERVICE_OPENAI);
+          const aiService = this.serviceLocator.getAiApiService();
 
           const { messagesWithRole } = await editorService.getMessagesFromEditor(editor, settings);
 

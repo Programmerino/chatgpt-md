@@ -125,13 +125,19 @@
   gap: var(--size-4-1);
   opacity: 0;
   transition: opacity 0.15s ease-in-out;
+  background-color: var(--background-primary);
+  border-radius: var(--radius-m);
+  padding: 2px;
+  box-shadow: var(--shadow-s);
+  border: 1px solid var(--background-modifier-border);
 }
 
-.chat-message:hover .chat-message-actions {
+.chat-message:hover .chat-message-actions,
+.chat-message.is-editing .chat-message-actions {
   opacity: 1;
 }
 
-.chat-message-copy-button {
+.chat-message-action-button {
   padding: var(--size-2-1);
   background-color: transparent;
   border: none;
@@ -140,19 +146,24 @@
   border-radius: var(--radius-s);
 }
 
-.chat-message-copy-button:hover {
+.chat-message-action-button:hover {
   background-color: var(--background-modifier-hover);
   color: var(--text-normal);
 }
 
-.chat-message.user .chat-message-copy-button {
-  color: var(--text-on-accent);
-  opacity: 0.7;
+.chat-message.user .chat-message-actions {
+  background-color: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: var(--shadow-s);
 }
 
-.chat-message.user .chat-message-copy-button:hover {
-  background-color: rgba(var(--mono-rgb-100), 0.2);
-  opacity: 1;
+.chat-message.user .chat-message-action-button {
+  color: var(--text-on-accent);
+  background-color: rgba(0, 0, 0, 0);
+}
+
+.chat-message.user .chat-message-action-button:hover {
+  background-color: rgba(0, 0, 0, 0.2);
 }
 
 .chat-input-container {
@@ -206,4 +217,21 @@
 
 .chat-input-container button.is-sending:hover {
   background-color: var(--background-modifier-error-hover);
+}
+
+/* Edit State Styles */
+.chat-message.is-editing .chat-message-content textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--size-4-2);
+  margin-bottom: var(--size-4-2);
+  border: 1px solid var(--background-modifier-border-focus);
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.chat-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--size-4-2);
 }

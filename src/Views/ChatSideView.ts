@@ -8,6 +8,7 @@ import {
   TFile,
   debounce,
   Setting,
+  Modal,
 } from "obsidian";
 import { ServiceLocator } from "../core/ServiceLocator";
 import { Message } from "../Models/Message";
@@ -280,9 +281,9 @@ export class ChatSideView extends ItemView {
       this.currentMessagesCache = newMessagesCache;
       this.messageContainer.empty();
 
-      for (const message of messagesWithRole) {
+      for (const [index, message] of messagesWithRole.entries()) {
         if (message.content.trim() === "") continue;
-        this.addMessageToView(message);
+        this.addMessageToView(message, index);
       }
     } catch (error) {
       console.error("Error rendering conversation in side view:", error);
@@ -292,18 +293,27 @@ export class ChatSideView extends ItemView {
     }
   }
 
-  addMessageToView(message: Message): HTMLElement {
+  addMessageToView(message: Message, index: number): HTMLElement {
     const messageEl = this.messageContainer.createDiv({
       cls: `chat-message ${message.role}`,
     });
+    messageEl.dataset.messageIndex = String(index);
 
     const messageActions = messageEl.createDiv({ cls: "chat-message-actions" });
-    const copyButton = messageActions.createEl("button", {
-      cls: "chat-message-copy-button",
-    });
+
+    const editButton = messageActions.createEl("button", { cls: "chat-message-action-button" });
+    setIcon(editButton, "pencil");
+    editButton.setAttribute("aria-label", "Edit message");
+    editButton.addEventListener("click", () => this.handleEdit(messageEl, message, index));
+
+    const deleteButton = messageActions.createEl("button", { cls: "chat-message-action-button" });
+    setIcon(deleteButton, "trash-2");
+    deleteButton.setAttribute("aria-label", "Delete message");
+    deleteButton.addEventListener("click", () => this.handleDelete(messageEl, index));
+
+    const copyButton = messageActions.createEl("button", { cls: "chat-message-action-button" });
     setIcon(copyButton, "copy");
     copyButton.setAttribute("aria-label", "Copy message");
-
     copyButton.addEventListener("click", () => {
       navigator.clipboard
         .writeText(message.content)
@@ -317,12 +327,88 @@ export class ChatSideView extends ItemView {
     return messageEl;
   }
 
+  private handleEdit(messageEl: HTMLElement, message: Message, index: number) {
+    const contentEl = messageEl.querySelector(".chat-message-content") as HTMLElement;
+    if (!contentEl) return;
+
+    contentEl.empty();
+    messageEl.addClass("is-editing");
+
+    const textArea = contentEl.createEl("textarea", { text: message.content });
+    textArea.rows = 8;
+    textArea.style.width = "100%";
+    textArea.focus();
+
+    const buttonContainer = contentEl.createDiv({ cls: "chat-edit-actions" });
+    const saveButton = buttonContainer.createEl("button", { text: "Save", cls: "mod-cta" });
+    const cancelButton = buttonContainer.createEl("button", { text: "Cancel" });
+
+    const removeEditUI = () => {
+      messageEl.removeClass("is-editing");
+      contentEl.empty();
+      MarkdownRenderer.render(this.app, message.content, contentEl, this.currentChatFile?.path || "", this);
+    };
+
+    saveButton.onclick = async () => {
+      const newContent = textArea.value;
+      if (this.currentChatFile) {
+        try {
+          await this.chatService.updateMessage(this.currentChatFile, index, newContent);
+          new Notice("Message updated.");
+          this.scheduleUpdate();
+        } catch (error) {
+          new Notice("Failed to update message.");
+          console.error(error);
+          removeEditUI();
+        }
+      }
+    };
+    cancelButton.onclick = removeEditUI;
+  }
+
+  private async handleDelete(messageEl: HTMLElement, index: number) {
+    const confirmed = await this.confirmDelete();
+    if (confirmed && this.currentChatFile) {
+      try {
+        await this.chatService.deleteMessage(this.currentChatFile, index);
+        messageEl.remove();
+        new Notice("Message deleted.");
+        this.scheduleUpdate();
+      } catch (error) {
+        new Notice("Failed to delete message.");
+        console.error(error);
+      }
+    }
+  }
+
+  private confirmDelete(): Promise<boolean> {
+    return new Promise((resolve) => {
+      const modal = new Modal(this.app);
+      modal.titleEl.setText("Delete Message");
+      modal.contentEl.setText("Are you sure you want to delete this message? This action cannot be undone.");
+      new Setting(modal.contentEl)
+        .addButton((btn) =>
+          btn
+            .setButtonText("Delete")
+            .setWarning()
+            .onClick(() => {
+              modal.close();
+              resolve(true);
+            })
+        )
+        .addButton((btn) =>
+          btn.setButtonText("Cancel").onClick(() => {
+            modal.close();
+            resolve(false);
+          })
+        );
+      modal.open();
+    });
+  }
+
   private startNewAssistantMessage() {
     this.currentAssistantMessageContent = "";
-    this.currentAssistantMessageEl = this.addMessageToView({
-      role: "assistant",
-      content: "▋",
-    });
+    this.currentAssistantMessageEl = this.addMessageToView({ role: "assistant", content: "▋" }, -1); // Use temp index
   }
 
   private appendChunkToView(chunk: string) {
@@ -367,7 +453,7 @@ export class ChatSideView extends ItemView {
     this.textInput.value = "";
     this.setButtonState("generating");
 
-    this.addMessageToView({ role: "user", content: message });
+    this.addMessageToView({ role: "user", content: message }, -1); // Temp index
     this.startNewAssistantMessage();
 
     try {

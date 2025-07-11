@@ -38,6 +38,7 @@ export class ServiceLocator {
   private apiService: ApiService;
   private apiAuthService: ApiAuthService;
   private apiResponseParser: ApiResponseParser;
+  private openAiService: OpenAiService;
   private settingsService: SettingsService;
   private chatService: ChatService;
 
@@ -72,6 +73,9 @@ export class ServiceLocator {
       this.apiResponseParser
     );
 
+    // Initialize the single AI service
+    this.openAiService = new OpenAiService(this.apiService, this.errorService, this.notificationService);
+
     // Initialize specialized services
     this.fileService = new FileService(this.app);
     this.frontmatterManager = new FrontmatterManager(this.app);
@@ -102,12 +106,11 @@ export class ServiceLocator {
   }
 
   /**
-   * Get an AI API service based on the service type
+   * Get the AI API service.
+   * As the plugin now exclusively uses OpenAI, this directly returns the OpenAiService instance.
    */
-  getAiApiService(serviceType: string): IAiApiService {
-    // Only OpenAI is supported now, so we can simplify this.
-    // Pass the singleton services to the constructor
-    return new OpenAiService(this.apiService, this.errorService, this.notificationService);
+  getAiApiService(): IAiApiService {
+    return this.openAiService;
   }
 
   // Getters for all services

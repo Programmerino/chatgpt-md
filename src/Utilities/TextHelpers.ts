@@ -134,7 +134,11 @@ export const escapeRegExp = (string: string): string => {
   return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 };
 
-export const splitMessages = (text: string | undefined): string[] => (text ? text.split(HORIZONTAL_LINE_MD) : []);
+export const splitMessages = (text: string | undefined): string[] => {
+  if (!text) return [];
+  // Split by the horizontal rule and filter out any empty or whitespace-only strings.
+  return text.split(HORIZONTAL_LINE_MD).filter((s) => s.trim().length > 0);
+};
 
 export const removeYAMLFrontMatter = (note: string | undefined): string | undefined => {
   if (!note) return note;

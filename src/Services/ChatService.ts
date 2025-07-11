@@ -1,8 +1,8 @@
 import { Editor, MarkdownView, Notice, Platform, TFile } from "obsidian";
 import { ServiceLocator } from "../core/ServiceLocator";
 import { SettingsService } from "./SettingsService";
-import { getHeadingPrefix } from "../Utilities/TextHelpers";
-import { ROLE_ASSISTANT, ROLE_USER } from "src/Constants";
+import { getHeadingPrefix, removeYAMLFrontMatter } from "../Utilities/TextHelpers";
+import { HORIZONTAL_LINE_MD, ROLE_ASSISTANT, ROLE_USER } from "src/Constants";
 import { ApiAuthService } from "./ApiAuthService";
 import { MessageService } from "./MessageService";
 import { IAiApiService } from "./AiService";
@@ -44,7 +44,7 @@ export class ChatService {
     editor?: Editor, // For direct streaming
     callbacks?: StreamCallbacks // For sidebar UI
   ) {
-    const aiService = this.serviceLocator.getAiApiService(frontmatter.aiService);
+    const aiService = this.serviceLocator.getAiApiService();
     const headingPrefix = getHeadingPrefix(settings.headingLevel);
     const apiKeyToUse = this.apiAuthService.getApiKey(settings, frontmatter.aiService);
 
@@ -121,7 +121,7 @@ export class ChatService {
     const editorService = this.serviceLocator.getEditorService();
     const settings = this.settingsService.getSettings();
     const frontmatter = await editorService.getFrontmatter(view.file, settings);
-    const aiService = this.serviceLocator.getAiApiService(frontmatter.aiService);
+    const aiService = this.serviceLocator.getAiApiService();
 
     if (!frontmatter.model) {
       this.notificationService.showWarning("Model not set in frontmatter, using default.");
@@ -203,5 +203,63 @@ export class ChatService {
     } finally {
       this.streaming = false;
     }
+  }
+
+  private async getFileContentParts(file: TFile): Promise<{ frontmatter: string; messageBlocks: string[] }> {
+    const fileContent = await this.serviceLocator.getApp().vault.read(file);
+    const fileCache = this.serviceLocator.getApp().metadataCache.getFileCache(file);
+    const frontmatterEndOffset = fileCache?.frontmatterPosition?.end.offset ?? 0;
+
+    const frontmatter = fileContent.substring(0, frontmatterEndOffset);
+    const content = fileContent.substring(frontmatterEndOffset).trim();
+
+    const messageBlocks = content ? content.split(new RegExp(`\\n*${HORIZONTAL_LINE_MD}\\n*`)) : [];
+
+    return { frontmatter, messageBlocks: messageBlocks.filter(Boolean) };
+  }
+
+  public async updateMessage(file: TFile, messageIndex: number, newContent: string): Promise<void> {
+    const { frontmatter, messageBlocks } = await this.getFileContentParts(file);
+
+    if (messageIndex < 0 || messageIndex >= messageBlocks.length) {
+      console.error(
+        `[ChatGPT MD] Update failed: Invalid message index ${messageIndex} for ${messageBlocks.length} messages.`
+      );
+      throw new Error("Invalid message index.");
+    }
+
+    const originalMessageBlock = messageBlocks[messageIndex];
+    const headerMatch = originalMessageBlock.match(/^#+\s*role::[\s\S]*?\n\n/m);
+
+    if (!headerMatch) {
+      console.error("[ChatGPT MD] Could not find message header in block:", originalMessageBlock);
+      throw new Error("Could not preserve message header during edit.");
+    }
+
+    const header = headerMatch[0];
+    messageBlocks[messageIndex] = `${header.trim()}\n\n${newContent.trim()}`;
+
+    const newContentJoined = messageBlocks.join(`\n\n${HORIZONTAL_LINE_MD}\n\n`);
+    const newFileContent = `${frontmatter}\n\n${newContentJoined}`;
+
+    await this.serviceLocator.getApp().vault.modify(file, newFileContent);
+  }
+
+  public async deleteMessage(file: TFile, messageIndex: number): Promise<void> {
+    const { frontmatter, messageBlocks } = await this.getFileContentParts(file);
+
+    if (messageIndex < 0 || messageIndex >= messageBlocks.length) {
+      console.error(
+        `[ChatGPT MD] Delete failed: Invalid message index ${messageIndex} for ${messageBlocks.length} messages.`
+      );
+      throw new Error("Invalid message index.");
+    }
+
+    messageBlocks.splice(messageIndex, 1);
+
+    const newContentJoined = messageBlocks.join(`\n\n${HORIZONTAL_LINE_MD}\n\n`);
+    const newFileContent = `${frontmatter}${messageBlocks.length > 0 ? `\n\n${newContentJoined}` : ""}`;
+
+    await this.serviceLocator.getApp().vault.modify(file, newFileContent);
   }
 }

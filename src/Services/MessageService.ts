@@ -12,7 +12,15 @@ import {
   ROLE_USER,
   WIKI_LINKS_REGEX,
 } from "src/Constants";
-import { getHeadingPrefix, escapeRegExp, unfinishedCodeBlock } from "../Utilities/TextHelpers";
+import {
+  getHeadingPrefix,
+  escapeRegExp,
+  unfinishedCodeBlock,
+  extractRoleAndMessage,
+  removeCommentsFromMessages,
+  splitMessages,
+  removeYAMLFrontMatter,
+} from "../Utilities/TextHelpers";
 
 /**
  * Service responsible for all message-related operations
@@ -58,110 +66,11 @@ export class MessageService {
   }
 
   /**
-   * Split text into messages based on horizontal line separator
-   */
-  splitMessages(text: string | undefined): string[] {
-    return text ? text.split(HORIZONTAL_LINE_MD) : [];
-  }
-
-  /**
-   * Remove YAML frontmatter from text using a more robust approach
-   */
-  removeYAMLFrontMatter(note: string | undefined): string | undefined {
-    if (!note) return note;
-
-    // Check if the note starts with frontmatter
-    if (!note.trim().startsWith("---")) {
-      return note;
-    }
-
-    // Find the end of frontmatter
-    const lines = note.split("\n");
-    let endIndex = -1;
-
-    // Skip first line (opening ---)
-    for (let i = 1; i < lines.length; i++) {
-      if (lines[i].trim() === "---") {
-        endIndex = i;
-        break;
-      }
-    }
-
-    if (endIndex === -1) {
-      // No closing ---, return original note
-      return note;
-    }
-
-    // Return content after frontmatter
-    return lines
-      .slice(endIndex + 1)
-      .join("\n")
-      .trim();
-  }
-
-  /**
-   * Remove comments from messages
-   */
-  removeCommentsFromMessages(message: string): string {
-    try {
-      const commentBlock = /=begin-chatgpt-md-comment[\s\S]*?=end-chatgpt-md-comment/g;
-      return message.replace(commentBlock, "");
-    } catch (err) {
-      this.notificationService.showError("Error removing comments from messages: " + err);
-      return message;
-    }
-  }
-
-  /**
-   * Extract role and content from a message
-   */
-  extractRoleAndMessage(message: string): Message {
-    try {
-      if (!message.includes(ROLE_IDENTIFIER)) {
-        return {
-          role: ROLE_USER,
-          content: message,
-        };
-      }
-
-      const [roleSection, ...contentSections] = message.split(ROLE_IDENTIFIER)[1].split("\n");
-      const cleanedRole = this.cleanupRole(roleSection);
-
-      return {
-        role: cleanedRole,
-        content: contentSections.join("\n").trim(),
-      };
-    } catch (error) {
-      this.notificationService.showError("Failed to extract role and message: " + error);
-      return {
-        role: ROLE_USER,
-        content: message,
-      };
-    }
-  }
-
-  /**
-   * Clean up role string to standardized format
-   */
-  private cleanupRole(role: string): string {
-    const trimmedRole = role.trim().toLowerCase();
-    const roles = [ROLE_USER, ROLE_ASSISTANT];
-    const foundRole = roles.find((r) => trimmedRole.includes(r));
-
-    if (foundRole) {
-      return foundRole;
-    }
-
-    this.notificationService.showWarning(`Unknown role: "${role}", defaulting to user`);
-    return ROLE_USER;
-  }
-
-  /**
    * Clean messages from the editor content
    */
   cleanMessages(content: string): string[] {
-    const messages = this.splitMessages(this.removeYAMLFrontMatter(content));
-    return messages.map((msg) => this.removeCommentsFromMessages(msg));
+    const messages = splitMessages(removeYAMLFrontMatter(content));
+    return messages.map((msg) => removeCommentsFromMessages(msg));
   }
 
   /**
@@ -192,7 +101,7 @@ export class MessageService {
 
     // 2. For each raw message, extract its role and content.
     // At this point, content still contains wikilinks like `[[...]]`.
-    let messagesWithRole: Message[] = rawMessages.map((msg) => this.extractRoleAndMessage(msg));
+    let messagesWithRole: Message[] = rawMessages.map((msg) => extractRoleAndMessage(msg));
 
     // 3. Asynchronously process each message to resolve and inline wikilinks.
     messagesWithRole = await Promise.all(
@@ -209,7 +118,7 @@ export class MessageService {
             if (linkedNoteContent) {
               // The content of the linked note is processed to remove its own frontmatter.
               // It is then treated as plain text and injected.
-              const processedContent = this.removeYAMLFrontMatter(linkedNoteContent);
+              const processedContent = removeYAMLFrontMatter(linkedNoteContent);
 
               if (processedContent) {
                 // Replace the wikilink placeholder with the actual content.
@@ -264,26 +173,6 @@ export class MessageService {
     return `${NEWLINE}${HORIZONTAL_LINE_MD}${NEWLINE}${headingPrefix}${ROLE_IDENTIFIER}${role}${
       model ? `<span style="font-size: small;"> (${model})</span>` : ``
     }${NEWLINE}`;
-  }
-
-  /**
-   * Format a message for display
-   */
-  formatMessage(message: Message, headingLevel: number, model?: string): string {
-    const headingPrefix = getHeadingPrefix(headingLevel);
-    const roleHeader = this.getHeaderRole(headingPrefix, message.role, model);
-    return `${roleHeader}${message.content}`;
-  }
-
-  /**
-   * Append a message to the editor
-   */
-  appendMessage(editor: Editor, message: string, headingLevel: number): void {
-    const headingPrefix = getHeadingPrefix(headingLevel);
-    const assistantRoleHeader = this.getHeaderRole(headingPrefix, ROLE_ASSISTANT);
-    const userRoleHeader = this.getHeaderRole(headingPrefix, ROLE_USER);
-
-    editor.replaceRange(`${assistantRoleHeader}${message}${userRoleHeader}`, editor.getCursor());
   }
 
   /**
