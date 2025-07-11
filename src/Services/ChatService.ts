@@ -104,7 +104,9 @@ export class ChatService {
         await this.serviceLocator.getCommandRegistry().handleAutoTitleInference(view, frontmatter, updatedMessages);
       }
     } catch (err) {
-      if (err.name !== "AbortError") {
+      if (err.name === "AbortError") {
+        new Notice("Request cancelled.");
+      } else {
         console.error("[ChatGPT MD] Chat processing error:", err);
         new Notice(`[ChatGPT MD] Error: ${err.message}`);
       }
@@ -135,8 +137,10 @@ export class ChatService {
       const configForTitleInference = { ...settings, ...frontmatter };
       await aiService.inferTitle(view, configForTitleInference, messages, editorService);
     } catch (error) {
-      this.notificationService.showError("Failed to infer title. Check the console for details.");
-      console.error("[ChatGPT MD] Title inference error:", error);
+      if (error.name !== "AbortError") {
+        this.notificationService.showError("Failed to infer title. Check the console for details.");
+        console.error("[ChatGPT MD] Title inference error:", error);
+      }
     } finally {
       this.notificationService.clearStatusBar();
     }
@@ -173,7 +177,12 @@ export class ChatService {
         callbacks
       );
 
-      // 4. Append the full response to the file now that streaming is complete.
+      // 4. For non-streaming, manually trigger the onDone callback with the full response
+      if (frontmatter.stream === false) {
+        callbacks.onDone(response.fullString);
+      }
+
+      // 5. Append the full response to the file now that streaming is complete.
       if (response && !response.wasAborted) {
         const assistantHeader = this.messageService.getHeaderRole(
           getHeadingPrefix(settings.headingLevel),
@@ -196,10 +205,89 @@ export class ChatService {
         }
       }
     } catch (err) {
-      if (err.name !== "AbortError") {
-        console.error("[ChatGPT MD] Chat processing error:", err);
-        new Notice(`[ChatGPT MD] Error: ${err.message}`);
+      if (err.name === "AbortError") {
+        callbacks.onDone(""); // Clear UI placeholder
+        throw err; // Re-throw to be handled by the UI
       }
+      callbacks.onDone("An error occurred. Please check the console for details.");
+      console.error("[ChatGPT MD] Chat processing error:", err);
+      new Notice(`[ChatGPT MD] Error: ${err.message}`);
+    } finally {
+      this.streaming = false;
+    }
+  }
+
+  public async regenerateResponse(file: TFile, fromMessageIndex: number, callbacks: StreamCallbacks) {
+    if (this.streaming) {
+      new Notice("A chat is already in progress.");
+      return;
+    }
+    this.streaming = true;
+    const editorService = this.serviceLocator.getEditorService();
+    const settings = this.settingsService.getSettings();
+    const vault = this.serviceLocator.getApp().vault;
+
+    try {
+      const { frontmatter, messageBlocks } = await this.getFileContentParts(file);
+
+      if (fromMessageIndex < 0 || fromMessageIndex >= messageBlocks.length) {
+        throw new Error("Invalid message index for regeneration.");
+      }
+
+      const messagesToKeep = messageBlocks.slice(0, fromMessageIndex + 1);
+      const contentWithMessagesToKeep = messagesToKeep.join(`\n\n${HORIZONTAL_LINE_MD}\n\n`);
+      const fileContentToProcess = `${frontmatter}\n\n${contentWithMessagesToKeep}`;
+
+      const { messagesWithRole } = await editorService.getMessagesFromFileContent(fileContentToProcess, settings);
+      const frontmatterData = await editorService.getFrontmatter(file, settings);
+
+      const truncatedFileContent = `${
+        frontmatter.trim() ? `${frontmatter.trim()}\n\n` : ""
+      }${contentWithMessagesToKeep}`;
+      await vault.modify(file, truncatedFileContent);
+
+      const response = await this._callAndProcessAI(
+        file,
+        messagesWithRole,
+        frontmatterData,
+        settings,
+        undefined,
+        callbacks
+      );
+
+      if (frontmatterData.stream === false) {
+        callbacks.onDone(response.fullString);
+      }
+
+      if (response && !response.wasAborted) {
+        const assistantHeader = this.messageService.getHeaderRole(
+          getHeadingPrefix(settings.headingLevel),
+          ROLE_ASSISTANT,
+          frontmatterData.model as string
+        );
+        const fullResponseText = `\n\n${HORIZONTAL_LINE_MD}\n\n${assistantHeader}${response.fullString}`;
+        await vault.append(file, fullResponseText);
+
+        const activeView = this.serviceLocator.getApp().workspace.getActiveViewOfType(MarkdownView);
+        if (activeView && activeView.file?.path === file.path) {
+          const updatedContent = await vault.read(file);
+          const { messages: updatedMessages } = await editorService.getMessagesFromFileContent(
+            updatedContent,
+            settings
+          );
+          await this.serviceLocator
+            .getCommandRegistry()
+            .handleAutoTitleInference(activeView, frontmatterData, updatedMessages);
+        }
+      }
+    } catch (err) {
+      if (err.name === "AbortError") {
+        callbacks.onDone(""); // Clear UI placeholder
+        throw err; // Re-throw to be handled by the UI
+      }
+      callbacks.onDone("An error occurred. Check console.");
+      console.error("[ChatGPT MD] Chat regeneration error:", err);
+      new Notice(`[ChatGPT MD] Error: ${err.message}`);
     } finally {
       this.streaming = false;
     }
@@ -213,7 +301,7 @@ export class ChatService {
     await this.serviceLocator.getApp().vault.modify(file, frontmatter.trim() ? `${frontmatter.trim()}\n\n` : "");
   }
 
-  private async getFileContentParts(file: TFile): Promise<{ frontmatter: string; messageBlocks: string[] }> {
+  public async getFileContentParts(file: TFile): Promise<{ frontmatter: string; messageBlocks: string[] }> {
     const fileContent = await this.serviceLocator.getApp().vault.read(file);
     const fileCache = this.serviceLocator.getApp().metadataCache.getFileCache(file);
     const frontmatterEndOffset = fileCache?.frontmatterPosition?.end.offset ?? 0;

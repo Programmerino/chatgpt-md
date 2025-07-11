@@ -46,9 +46,6 @@ export class ApiService {
     console.log("[ChatGPT MD] Created new AbortController for streaming request.");
 
     try {
-      // Note: `fetch` is used here instead of `requestUrl` because `requestUrl`
-      // does not support streaming responses, which is essential for this feature.
-      // This is a known limitation when targeting mobile platforms.
       const response = await fetch(url, {
         method: "POST",
         headers,
@@ -88,38 +85,32 @@ export class ApiService {
     headers: Record<string, string>,
     serviceType: string
   ): Promise<any> {
-    // Use requestUrl for both mobile and desktop for consistency and to follow Obsidian guidelines.
-    // Note: requestUrl does not support AbortController, so non-streaming requests are not cancellable.
+    this.abortController = new AbortController();
+    console.log("[ChatGPT MD] Created new AbortController for non-streaming request.");
+
     try {
-      const responseUrl = await requestUrl({
-        url,
+      const response = await fetch(url, {
         method: "POST",
         headers,
-        contentType: "application/json",
         body: JSON.stringify(payload),
-        throw: false,
+        signal: this.abortController.signal,
       });
 
-      if (responseUrl.status >= 400) {
-        // handleApiError will throw an error, which will be caught by the catch block.
-        this.errorService.handleApiError(responseUrl.json, serviceType, {
-          returnForChat: false, // This will cause it to throw
-          showNotification: true,
-          context: { model: payload.model, url, status: responseUrl.status },
-        });
+      if (!response.ok) {
+        throw await this.handleHttpError(response, serviceType, payload, url);
       }
 
-      return this.apiResponseParser.parseNonStreamingResponse(responseUrl.json, serviceType);
+      const json = await response.json();
+      return this.apiResponseParser.parseNonStreamingResponse(json, serviceType);
     } catch (error) {
       if (error.name === "AbortError") {
-        throw error; // Propagate abort errors
+        console.log("[ChatGPT MD] Non-streaming fetch() call was aborted.");
+        throw error; // Propagate abort so the UI can update correctly
       }
-      // Catch errors from requestUrl itself or from handleApiError
-      return this.errorService.handleApiError(error, serviceType, {
-        returnForChat: true, // This will return a user-friendly string
-        showNotification: true,
-        context: { model: payload.model, url },
-      });
+      return this.handleRequestError(error, serviceType, payload, url);
+    } finally {
+      // Ensure the controller is cleaned up after the request is complete or fails.
+      this.abortController = null;
     }
   }
 

@@ -1,4 +1,4 @@
-import { App, MarkdownView, Notice, TFile } from "obsidian";
+import { App, MarkdownView, Notice, TFile, moment } from "obsidian";
 import { createFolderModal } from "src/Utilities/ModalHelpers";
 
 /**
@@ -116,7 +116,6 @@ export class FileService {
    * Format a date according to the given format
    */
   formatDate(date: Date, format: string): string {
-    // Simple implementation - in a real app, you'd want a more robust date formatter
-    return date.toISOString().replace(/[-:]/g, "").replace(/\..+/, "");
+    return moment(date).format(format);
   }
 }

@@ -13,8 +13,8 @@ if (!newVersion) {
   process.exit(1);
 }
 
-// Base version validation (x.y.z format)
-if (!/^\d+\.\d+\.\d+(-\w+(\.\d+)?)?$/.test(newVersion)) {
+// Base version validation (x.y.z or x.y.z-label.n)
+if (!/^\d+\.\d+\.\d+(-[\w.]+)?$/.test(newVersion)) {
   console.error("Error: Version must be in format x.y.z or x.y.z-label.n");
   process.exit(1);
 }
@@ -38,20 +38,13 @@ try {
   process.exit(1);
 }
 
-// Get minAppVersion from manifest.json
-let minAppVersion;
-try {
-  const manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
-  minAppVersion = manifest.minAppVersion;
-} catch (error) {
-  console.error("❌ Failed to read minAppVersion from manifest.json:", error.message);
-  process.exit(1);
-}
-
-// Update the correct manifest file
+// Determine which manifest to update and read minAppVersion from it
 const manifestFileToUpdate = isBeta ? "manifest-beta.json" : "manifest.json";
+let minAppVersion;
+
 try {
   const manifest = JSON.parse(readFileSync(manifestFileToUpdate, "utf8"));
+  minAppVersion = manifest.minAppVersion;
   manifest.version = versionWithSuffix;
   writeFileSync(manifestFileToUpdate, JSON.stringify(manifest, null, 2) + "\n");
   console.log(`✅ Updated ${manifestFileToUpdate}`);

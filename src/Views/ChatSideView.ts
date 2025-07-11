@@ -294,9 +294,13 @@ export class ChatSideView extends ItemView {
       this.currentMessagesCache = newMessagesCache;
       this.messageContainer.empty();
 
+      const isLastMessageUser =
+        messagesWithRole.length > 0 && messagesWithRole[messagesWithRole.length - 1].role === "user";
+
       for (const [index, message] of messagesWithRole.entries()) {
         if (message.content.trim() === "") continue;
-        this.addMessageToView(message, index);
+        const isLast = isLastMessageUser && index === messagesWithRole.length - 1;
+        this.addMessageToView(message, index, isLast);
       }
     } catch (error) {
       console.error("Error rendering conversation in side view:", error);
@@ -306,13 +310,20 @@ export class ChatSideView extends ItemView {
     }
   }
 
-  addMessageToView(message: Message, index: number): HTMLElement {
+  addMessageToView(message: Message, index: number, isLastUserMessage: boolean = false): HTMLElement {
     const messageEl = this.messageContainer.createDiv({
       cls: `chat-message ${message.role}`,
     });
     messageEl.dataset.messageIndex = String(index);
 
     const messageActions = messageEl.createDiv({ cls: "chat-message-actions" });
+
+    if (isLastUserMessage) {
+      const regenerateButton = messageActions.createEl("button", { cls: "chat-message-action-button" });
+      setIcon(regenerateButton, "zap");
+      regenerateButton.setAttribute("aria-label", "Generate response");
+      regenerateButton.addEventListener("click", () => this.handleRegenerate(index));
+    }
 
     const editButton = messageActions.createEl("button", { cls: "chat-message-action-button" });
     setIcon(editButton, "pencil");
@@ -526,12 +537,42 @@ export class ChatSideView extends ItemView {
         onDone: (fullText: string) => this.finalizeAssistantMessage(fullText),
       });
     } catch (err) {
-      console.error("[ChatGPT MD] Error sending message from sidebar:", err);
-      this.finalizeAssistantMessage("An error occurred. Please check the console for details.");
+      if (err.name === "AbortError") {
+        new Notice("Request cancelled.");
+        this.finalizeAssistantMessage(""); // Clear the placeholder
+      } else {
+        console.error("[ChatGPT MD] Error sending message from sidebar:", err);
+        this.finalizeAssistantMessage("An error occurred. Please check the console for details.");
+      }
     } finally {
       this.setButtonState("idle");
       this.textInput.focus();
       this.scheduleUpdate();
+    }
+  }
+
+  private async handleRegenerate(index: number) {
+    if (this.isAwaitingResponse || !this.currentChatFile) return;
+
+    this.setButtonState("generating");
+    this.startNewAssistantMessage(); // Show visual feedback immediately
+
+    try {
+      await this.chatService.regenerateResponse(this.currentChatFile, index, {
+        onChunk: (chunk: string) => this.appendChunkToView(chunk),
+        onDone: (fullText: string) => this.finalizeAssistantMessage(fullText),
+      });
+    } catch (err) {
+      if (err.name === "AbortError") {
+        new Notice("Request cancelled.");
+        this.finalizeAssistantMessage("");
+      } else {
+        console.error("[ChatGPT MD] Error regenerating response from sidebar:", err);
+        this.finalizeAssistantMessage("An error occurred. Please check the console for details.");
+      }
+    } finally {
+      this.setButtonState("idle");
+      this.textInput.focus();
     }
   }
 

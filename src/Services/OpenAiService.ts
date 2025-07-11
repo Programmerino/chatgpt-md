@@ -10,7 +10,7 @@ import { NotificationService } from "./NotificationService";
 
 export const DEFAULT_OPENAI_CONFIG: OpenAIConfig = {
   aiService: AI_SERVICE_OPENAI,
-  model: "gpt-4.1-mini",
+  model: "gpt-4o-mini",
   stream: true,
   system_commands: null,
   tags: [],
@@ -18,7 +18,7 @@ export const DEFAULT_OPENAI_CONFIG: OpenAIConfig = {
   url: "https://api.openai.com",
 };
 
-export const fetchAvailableOpenAiModels = async (app: App, url: string, apiKey: string) => {
+export const fetchAvailableOpenAiModels = async (app: App, url: string, apiKey: string): Promise<string[]> => {
   try {
     const apiAuthService = new ApiAuthService();
 
@@ -47,7 +47,7 @@ export const fetchAvailableOpenAiModels = async (app: App, url: string, apiKey: 
         if (a.id > b.id) return -1;
         return 0;
       })
-      .map((model: OpenAiModel) => `${AI_SERVICE_OPENAI}@${model.id}`);
+      .map((model: OpenAiModel) => model.id);
   } catch (error) {
     console.error("Error fetching OpenAI models:", error);
     return [];
@@ -74,11 +74,7 @@ export class OpenAiService extends BaseAiService implements IAiApiService {
   }
 
   createPayload(config: Record<string, unknown>, messages: Message[]): OpenAIStreamPayload {
-    const modelName =
-      typeof config.model === "string" && config.model.includes("@")
-        ? config.model.split("@")[1]
-        : (config.model as string);
-
+    const modelName = config.model as string;
     const systemCommands = Array.isArray(config.system_commands) ? (config.system_commands as string[]) : null;
     const processedMessages = this.processSystemCommands(messages, systemCommands);
 
@@ -112,16 +108,8 @@ export class OpenAiService extends BaseAiService implements IAiApiService {
     settings?: ChatGPT_MDSettings,
     callbacks?: StreamCallbacks
   ): Promise<{ fullString: string; mode: "streaming"; wasAborted?: boolean }> {
-    if (Platform.isMobile) {
-      // Fallback to non-streaming on mobile as fetch-based streaming is unreliable
-      const response = await this.callNonStreamingAPI(apiKey, messages, config, settings);
-      return {
-        fullString: response.fullString,
-        mode: "streaming", // Keep mode as streaming for the caller
-        wasAborted: false,
-      };
-    }
-
+    // Unify behavior across platforms by using the default streaming implementation for all.
+    // This ensures that cancellation works on mobile as well.
     return this.defaultCallStreamingAPI(
       apiKey,
       messages,

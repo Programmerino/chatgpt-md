@@ -55,7 +55,7 @@ export const ROLE_USER = "user";
 
 export const DEFAULT_CHAT_FRONT_MATTER = `---
 system_commands: ['I am a helpful assistant.']
-model: gpt-4.1-mini
+model: gpt-4o-mini
 stream: true
 ---`;
 
