@@ -42,10 +42,12 @@ export class ApiService {
     headers: Record<string, string>,
     serviceType: string
   ): Promise<Response> {
-    // We use `fetch` directly for streaming, as `requestUrl` from the Obsidian API
-    // does not support reading from a stream. This is a necessary deviation from
-    // the plugin guidelines to enable real-time response updates. This implementation
-    // includes an AbortController to ensure requests can be cancelled.
+    // We use the native `fetch` API directly for streaming and request cancellation,
+    // as `requestUrl` from the Obsidian API does not support reading from a stream
+    // or passing an AbortSignal. This is a necessary deviation from the plugin
+    // development guidelines to enable these core features. The implementation
+
+    // includes an AbortController to ensure requests can be reliably cancelled.
     this.abortController = new AbortController();
 
     try {

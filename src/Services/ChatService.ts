@@ -7,6 +7,7 @@ import { ApiAuthService } from "./ApiAuthService";
 import { MessageService } from "./MessageService";
 import { ChatGPT_MDSettings } from "src/Models/Config";
 import { EditorService } from "./EditorService";
+import { Message } from "src/Models/Message";
 
 export interface StreamCallbacks {
   onChunk: (chunk: string) => void;
@@ -37,7 +38,7 @@ export class ChatService {
 
   private async _callAndProcessAI(
     file: TFile,
-    messagesWithRole: any[],
+    messagesWithRole: Message[],
     frontmatter: Record<string, unknown>,
     settings: ChatGPT_MDSettings,
     editor?: Editor, // For direct streaming

@@ -74,7 +74,7 @@ export class EditorService {
 
   // FrontmatterService delegations
 
-  async getFrontmatter(file: TFile | null, settings: ChatGPT_MDSettings): Promise<any> {
+  async getFrontmatter(file: TFile | null, settings: ChatGPT_MDSettings): Promise<Record<string, unknown>> {
     return await this.frontmatterService.getFrontmatter(file, settings);
   }
 

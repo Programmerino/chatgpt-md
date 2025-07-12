@@ -27,6 +27,8 @@ export interface ChatBehaviorSettings {
   stream: boolean;
   /** Whether to disable the plugin's system message */
   disablePluginSystemMessage: boolean;
+  /** Whether Enter key sends message, or Shift+Enter */
+  enterToSend: boolean;
 }
 
 /**
@@ -85,6 +87,7 @@ export const DEFAULT_SETTINGS: ChatGPT_MDSettings = {
   // Chat Behavior
   stream: true,
   disablePluginSystemMessage: false,
+  enterToSend: true,
 
   // Formatting
   dateFormat: DEFAULT_DATE_FORMAT,

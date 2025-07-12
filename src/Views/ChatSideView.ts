@@ -144,9 +144,29 @@ export class ChatSideView extends ItemView {
     });
 
     this.textInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
+      const settings = this.serviceLocator.getSettingsService().getSettings();
+      const enterToSend = settings.enterToSend ?? true;
+
+      const isEnter = e.key === "Enter";
+      const isShift = e.shiftKey;
+      const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+
+      if (isEnter && isCtrlOrCmd) {
         e.preventDefault();
         this.sendButton.click();
+        return;
+      }
+
+      if (enterToSend) {
+        if (isEnter && !isShift) {
+          e.preventDefault();
+          this.sendButton.click();
+        }
+      } else {
+        if (isEnter && isShift) {
+          e.preventDefault();
+          this.sendButton.click();
+        }
       }
     });
 

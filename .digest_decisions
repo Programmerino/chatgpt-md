@@ -206,5 +206,9 @@
     "llm_context/obsidian.md": {
         "include": true,
         "lines": "all"
+    },
+    "src/Views/ImportConversationModal.ts": {
+        "include": true,
+        "lines": "all"
     }
 }

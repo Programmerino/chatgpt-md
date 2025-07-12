@@ -33,70 +33,77 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
     const settingsSchema: SettingDefinition[] = [
       {
         id: "apiKey",
-        name: "OpenAI API Key",
-        description: "API Key for OpenAI",
+        name: "OpenAI API key",
+        description: "Your API key for OpenAI.",
         type: "text",
-        placeholder: "your openAI API Key",
+        placeholder: "your-openai-api-key",
         group: "API Keys",
       },
       {
         id: "openaiUrl",
         name: "OpenAI API URL",
-        description: `URL for OpenAI API\nDefault URL: ${DEFAULT_OPENAI_CONFIG.url}`,
+        description: `The URL for the OpenAI API. Default is ${DEFAULT_OPENAI_CONFIG.url}.`,
         type: "text",
         placeholder: DEFAULT_OPENAI_CONFIG.url,
         group: "Service URLs",
       },
       {
         id: "defaultChatFrontmatter",
-        name: "Default Chat Frontmatter",
-        description:
-          "Default frontmatter for new chat files. You can use all of the settings exposed by the OpenAI API here: https://platform.openai.com/docs/api-reference/chat/create",
+        name: "Default chat frontmatter",
+        description: "Default frontmatter for new chat files. You can use all parameters from the OpenAI API here.",
         type: "textarea",
         placeholder: DEFAULT_CHAT_FRONT_MATTER,
         group: "Chat Behavior",
       },
       {
         id: "stream",
-        name: "Stream",
-        description: "Stream responses from the AI",
+        name: "Stream responses",
+        description: "Stream responses from the AI in real-time.",
+        type: "toggle",
+        group: "Chat Behavior",
+      },
+      {
+        id: "enterToSend",
+        name: "Send on enter",
+        description:
+          "If enabled, pressing Enter sends the message. Pressing Shift+Enter creates a new line. If disabled, the behavior is reversed.",
         type: "toggle",
         group: "Chat Behavior",
       },
       {
         id: "disablePluginSystemMessage",
-        name: "Disable Plugin System Message",
+        name: "Disable plugin system message",
         description: "If enabled, the plugin's system message will not be added to your prompts.",
         type: "toggle",
         group: "Chat Behavior",
       },
       {
         id: "chatFolder",
-        name: "Chat Folder",
-        description: "Path to folder for chat files",
+        name: "Chat folder",
+        description: "Path to the folder for storing chat files.",
         type: "text",
         group: "Folders",
       },
       {
         id: "chatTemplateFolder",
-        name: "Chat Template Folder",
-        description: "Path to folder for chat file templates",
+        name: "Chat template folder",
+        description: "Path to the folder for storing chat file templates.",
         type: "text",
         placeholder: "chat-templates",
         group: "Folders",
       },
       {
         id: "dateFormat",
-        name: "Date Format",
-        description: "Date format for chat files. Valid date blocks are: YYYY, MM, DD, hh, mm, ss",
+        name: "Date format",
+        description: "Moment.js format for chat file names. Valid date blocks are: YYYY, MM, DD, hh, mm, ss.",
         type: "text",
         placeholder: DEFAULT_DATE_FORMAT,
         group: "Formatting",
       },
       {
         id: "headingLevel",
-        name: "Heading Level",
-        description: `Heading level for messages (example for heading level 2: '## ${ROLE_IDENTIFIER}${ROLE_USER}'). Valid heading levels are from 0 to 6.`,
+        name: "Heading level",
+        description: `Heading level for messages (e.g., '## ${ROLE_IDENTIFIER}${ROLE_USER}'). Valid levels are 0 to 6.`,
         type: "text",
         group: "Formatting",
       },
@@ -111,11 +118,10 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
     });
 
     Object.entries(groupedSettings).forEach(([group, settings]) => {
-      containerEl.createEl("h3", { text: group });
+      new Setting(containerEl).setHeading().setName(group);
       settings.forEach((setting) => {
         this.createSettingElement(containerEl, setting);
       });
-      containerEl.createEl("hr");
     });
   }
 
@@ -128,7 +134,8 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
           .setPlaceholder(schema.placeholder || "")
           .setValue(String(this.settingsProvider.settings[schema.id]))
           .onChange(async (value) => {
-            (this.settingsProvider.settings[schema.id] as string) = value;
+            (this.settingsProvider.settings[schema.id] as string | number) =
+              schema.id === "headingLevel" ? parseInt(value, 10) : value;
             await this.settingsProvider.saveSettings();
           });
         text.inputEl.style.width = "300px";
