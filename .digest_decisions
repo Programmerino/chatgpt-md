@@ -1,0 +1,210 @@
+{
+    ".editorconfig": {
+        "include": true,
+        "lines": "all"
+    },
+    ".gitignore": {
+        "include": true,
+        "lines": "all"
+    },
+    ".npmrc": {
+        "include": true,
+        "lines": "all"
+    },
+    ".prettierignore": {
+        "include": true,
+        "lines": "all"
+    },
+    ".prettierrc": {
+        "include": true,
+        "lines": "all"
+    },
+    "BUILD_OPTIMIZATION.md": {
+        "include": true,
+        "lines": "all"
+    },
+    "CHANGELOG.md": {
+        "include": true,
+        "lines": "all"
+    },
+    "LICENSE": {
+        "include": true,
+        "lines": "all"
+    },
+    "README.md": {
+        "include": true,
+        "lines": "all"
+    },
+    "VERSION_MANAGEMENT.md": {
+        "include": true,
+        "lines": "all"
+    },
+    "esbuild.config.mjs": {
+        "include": true,
+        "lines": "all"
+    },
+    "eslint.config.js": {
+        "include": true,
+        "lines": "all"
+    },
+    "manifest.json": {
+        "include": true,
+        "lines": "all"
+    },
+    "tsconfig.json": {
+        "include": true,
+        "lines": "all"
+    },
+    "update-version.mjs": {
+        "include": true,
+        "lines": "all"
+    },
+    "versions.json": {
+        "include": true,
+        "lines": "all"
+    },
+    "flake.nix": {
+        "include": true,
+        "lines": "all"
+    },
+    "flake.lock": {
+        "include": false,
+        "lines": "all"
+    },
+    "package.json": {
+        "include": true,
+        "lines": "all"
+    },
+    "yarn.lock": {
+        "include": false,
+        "lines": "all"
+    },
+    "styles.css": {
+        "include": true,
+        "lines": "all"
+    },
+    "scripts/analyze-bundle.mjs": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/main.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Constants.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Models/Message.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Models/Config.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Services/ApiAuthService.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Services/ErrorService.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Services/FileService.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Services/FrontmatterManager.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Services/NotificationService.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Services/SettingsService.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Services/TemplateService.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Services/ApiService.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Services/EditorContentService.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Services/AiService.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Services/ApiResponseParser.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Services/EditorService.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Services/MessageService.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Services/OpenAiService.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Services/ChatService.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Services/FrontmatterService.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Utilities/ModalHelpers.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Utilities/TextHelpers.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Views/ChatTemplatesSuggestModal.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Views/FolderCreationModal.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Views/MockResponseModal.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Views/ChatGPT_MDSettingsTab.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/Views/ChatSideView.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/core/ServiceLocator.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "src/core/CommandRegistry.ts": {
+        "include": true,
+        "lines": "all"
+    },
+    "llm_context/obsidian.md": {
+        "include": true,
+        "lines": "all"
+    }
+}

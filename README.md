@@ -65,6 +65,7 @@ Run commands from Obsidian's command pallet via `cmd + p` or `ctrl + p` and star
 
 #### Creation Commands
 - **New Chat From Template**: Create chats from templates.
+- **Import from AI Studio**: Creates a new chat note by importing a conversation from Google's AI Studio JSON format.
 
 #### Utility Commands
 - **Clear Chat**: Clears the conversation history from the current note, preserving only the frontmatter.

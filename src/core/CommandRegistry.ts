@@ -9,11 +9,13 @@ import {
   CLEAR_CHAT_COMMAND_ID,
   DEBUG_REQUEST_COMMAND_ID,
   FETCH_MODELS_TIMEOUT_MS,
+  IMPORT_FROM_AI_STUDIO_COMMAND_ID,
   STOP_GENERATING_COMMAND_ID,
   TOGGLE_CHAT_SIDEBAR_COMMAND_ID,
 } from "src/Constants";
 import { ApiAuthService, isValidApiKey } from "../Services/ApiAuthService";
 import { CHAT_SIDE_VIEW_TYPE } from "src/Views/ChatSideView";
+import { ImportConversationModal } from "src/Views/ImportConversationModal";
 
 /**
  * Registers and manages commands for the plugin
@@ -45,6 +47,7 @@ export class CommandRegistry {
     this.registerCancelGenerationCommand();
     this.registerChooseChatTemplateCommand();
     this.registerClearChatCommand();
+    this.registerImportFromAiStudioCommand();
   }
 
   /**
@@ -190,6 +193,25 @@ export class CommandRegistry {
       editorCallback: async (editor: Editor, _view: MarkdownView) => {
         const editorService = this.serviceLocator.getEditorService();
         await editorService.clearChat(editor);
+      },
+    });
+  }
+
+  /**
+   * Register the import from AI Studio command
+   */
+  private registerImportFromAiStudioCommand(): void {
+    this.plugin.addCommand({
+      id: IMPORT_FROM_AI_STUDIO_COMMAND_ID,
+      name: "Import from AI Studio",
+      icon: "file-import",
+      callback: () => {
+        new ImportConversationModal(
+          this.plugin.app,
+          this.serviceLocator.getSettingsService(),
+          this.serviceLocator.getFileService(),
+          this.serviceLocator.getMessageService()
+        ).open();
       },
     });
   }
