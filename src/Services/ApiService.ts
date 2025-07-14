@@ -42,12 +42,24 @@ export class ApiService {
     headers: Record<string, string>,
     serviceType: string
   ): Promise<Response> {
-    // We use the native `fetch` API directly for streaming and request cancellation,
-    // as `requestUrl` from the Obsidian API does not support reading from a stream
-    // or passing an AbortSignal. This is a necessary deviation from the plugin
-    // development guidelines to enable these core features. The implementation
-
-    // includes an AbortController to ensure requests can be reliably cancelled.
+    /*
+     * DEVELOPER/AGENT NOTE:
+     * This method intentionally uses the native `fetch` API instead of Obsidian's `requestUrl`.
+     * This is a deliberate choice to enable two critical features not supported by `requestUrl`:
+     * 1.  **Response Streaming:** `fetch` returns a `Response` object with a readable stream (`response.body`),
+     *     which is essential for displaying AI-generated content token-by-token.
+     * 2.  **Request Cancellation:** `fetch` accepts an `AbortSignal` from an `AbortController`. This allows
+     *     the user to stop an in-progress API request, which is a crucial user experience feature
+     *     for long-running AI generations.
+     *
+     * DO NOT replace `fetch` with `requestUrl`.
+     * DO NOT remove the `AbortController` or `signal` logic.
+     *
+     * This is a necessary deviation from the standard Obsidian plugin development guidelines which
+     * recommend using `requestUrl` for network requests to ensure mobile compatibility.
+     * The functionality provided by `fetch` here is considered more important for this plugin's
+     * core purpose than strict adherence to that specific guideline.
+     */
     this.abortController = new AbortController();
 
     try {
@@ -90,6 +102,12 @@ export class ApiService {
     headers: Record<string, string>,
     serviceType: string
   ): Promise<any> {
+    /*
+     * DEVELOPER/AGENT NOTE:
+     * This method uses `fetch` instead of `requestUrl` to support request cancellation via AbortController.
+     * This is a critical feature for the user experience. Do not replace this with `requestUrl`
+     * without also implementing a way to cancel the request. See `makeStreamingRequest` for more details.
+     */
     this.abortController = new AbortController();
 
     try {

@@ -35,3 +35,4 @@ This will update `manifest-beta.json` instead of `manifest.json`, while still up
     ```
 4.  Create a release on GitHub using the new tag.
 5.  Update the release notes with changes since the last version.
+6.  **(For Nix users)** Update the `version` in `flake.nix` to match the new release. If dependencies in `yarn.lock` have changed, update `yarnDepsHash` by running `nix-prefetch-yarn-deps yarn.lock`.

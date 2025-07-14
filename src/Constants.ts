@@ -27,8 +27,6 @@ export const CHAT_FOLDER_TYPE = "chatFolder";
 export const CHAT_TEMPLATE_FOLDER_TYPE = "chatTemplateFolder";
 
 export const NEWLINE = "\n\n";
-export const WIKI_LINKS_REGEX = /\[\[([^\][]+)\]\]/g;
-export const MARKDOWN_LINKS_REGEX = /\[([^\]]+)\]\(([^()]+)\)/g;
 
 export const DEFAULT_HEADING_LEVEL = 3;
 export const MAX_HEADING_LEVEL = 6;

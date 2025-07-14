@@ -13,6 +13,9 @@
 - **Codebase Health**: Refactored internal services to align with Obsidian API best practices, improving file handling safety and reducing complexity.
 - **API Handling**: Removed special filtering for AI models and citations to provide a more direct and unopinionated API experience.
 
+### Feature Enhancements
+- **Enhanced Link Inlining**: Reworked how linked notes are inlined for context. `[[wikilinks]]` are now inlined as Markdown code blocks containing the note's content, and `![[embeds]]` are inlined as raw text.
+
 ## v2.2.0 (April 12, 2024) - Refactoring & Stability
 
 ### Feature Enhancements

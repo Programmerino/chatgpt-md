@@ -1,4 +1,4 @@
-import { App, Notice, TFile, moment } from "obsidian";
+import { App, Notice, TFile, TFolder, moment } from "obsidian";
 import { createFolderModal } from "src/Utilities/ModalHelpers";
 
 /**
@@ -82,6 +82,16 @@ export class FileService {
       console.error(`Error reading linked note: ${linkPath}`, error);
       return null;
     }
+  }
+
+  /**
+   * Get the TFile for a given link path.
+   * @param linkPath The link path to resolve
+   * @param sourcePath The path of the file containing the link
+   * @returns The resolved TFile, or null if not found
+   */
+  public getFirstLinkpathDest(linkPath: string, sourcePath: string = ""): TFile | null {
+    return this.app.metadataCache.getFirstLinkpathDest(linkPath, sourcePath);
   }
 
   /**

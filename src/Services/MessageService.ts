@@ -1,25 +1,22 @@
-import { Editor } from "obsidian";
+import { Editor, TFile } from "obsidian";
 import { Message } from "src/Models/Message";
 import { ChatGPT_MDSettings } from "src/Models/Config";
 import { FileService } from "./FileService";
 import { NotificationService } from "./NotificationService";
-import {
-  HORIZONTAL_LINE_MD,
-  MARKDOWN_LINKS_REGEX,
-  NEWLINE,
-  ROLE_ASSISTANT,
-  ROLE_IDENTIFIER,
-  ROLE_USER,
-  WIKI_LINKS_REGEX,
-} from "src/Constants";
+import { HORIZONTAL_LINE_MD, NEWLINE, ROLE_ASSISTANT, ROLE_IDENTIFIER, ROLE_USER } from "src/Constants";
 import {
   getHeadingPrefix,
-  escapeRegExp,
   unfinishedCodeBlock,
   extractRoleAndMessage,
   splitMessages,
   removeYAMLFrontMatter,
 } from "../Utilities/TextHelpers";
+
+// Interface to hold a regex match and its type for clear processing
+interface LinkMatch {
+  match: RegExpMatchArray;
+  type: "embed" | "wikilink";
+}
 
 /**
  * Service responsible for all message-related operations
@@ -30,39 +27,6 @@ export class MessageService {
     private fileService: FileService,
     private notificationService: NotificationService
   ) {}
-
-  /**
-   * Find links in a message
-   */
-  findLinksInMessage(message: string): { link: string; title: string }[] {
-    const regexes = [
-      { regex: WIKI_LINKS_REGEX, fullMatchIndex: 0, titleIndex: 1 },
-      { regex: MARKDOWN_LINKS_REGEX, fullMatchIndex: 0, titleIndex: 2 },
-    ];
-
-    const links: { link: string; title: string }[] = [];
-    const seenTitles = new Set<string>();
-
-    for (const { regex, fullMatchIndex, titleIndex } of regexes) {
-      for (const match of message.matchAll(regex)) {
-        const fullLink = match[fullMatchIndex];
-        const linkTitle = match[titleIndex];
-
-        // Skip URLs that start with http:// or https://
-        if (
-          linkTitle &&
-          !seenTitles.has(linkTitle) &&
-          !linkTitle.startsWith("http://") &&
-          !linkTitle.startsWith("https://")
-        ) {
-          links.push({ link: fullLink, title: linkTitle });
-          seenTitles.add(linkTitle);
-        }
-      }
-    }
-
-    return links;
-  }
 
   /**
    * Clean messages from the editor content
@@ -85,7 +49,7 @@ export class MessageService {
   }
 
   /**
-   * Get messages from a string content
+   * Get messages from a string content, processing and inlining wikilinks and embeds.
    */
   async getMessages(
     content: string,
@@ -98,45 +62,72 @@ export class MessageService {
     const rawMessages = this.cleanMessages(content);
 
     // 2. For each raw message, extract its role and content.
-    // At this point, content still contains wikilinks like `[[...]]`.
     let messagesWithRole: Message[] = rawMessages.map((msg) => extractRoleAndMessage(msg));
 
     // 3. Asynchronously process each message to resolve and inline wikilinks.
     messagesWithRole = await Promise.all(
       messagesWithRole.map(async (message) => {
-        // Find all links in the current message's content.
-        const links = this.findLinksInMessage(message.content);
-        let updatedContent = message.content;
+        const currentContent = message.content;
 
-        // Iterate over found links and replace them with the content of the linked note.
-        for (const link of links) {
+        const embedRegex = /\!\[\[([^|\]\n]+)(?:\|.*)?\]\]/g;
+        const wikilinkRegex = /(?<!\!)\[\[([^|\]\n]+)(?:\|.*)?\]\]/g;
+
+        // Find all matches and tag them with their type.
+        const embedMatches: LinkMatch[] = Array.from(currentContent.matchAll(embedRegex)).map((m) => ({
+          match: m,
+          type: "embed",
+        }));
+        const wikilinkMatches: LinkMatch[] = Array.from(currentContent.matchAll(wikilinkRegex)).map((m) => ({
+          match: m,
+          type: "wikilink",
+        }));
+
+        const allMatches = [...embedMatches, ...wikilinkMatches].sort((a, b) => a.match.index! - b.match.index!);
+
+        if (allMatches.length === 0) {
+          return message;
+        }
+
+        // Rebuild the content string by replacing links part-by-part.
+        const newContentParts: string[] = [];
+        let lastIndex = 0;
+
+        for (const { match, type } of allMatches) {
+          // Add text before the match
+          newContentParts.push(currentContent.substring(lastIndex, match.index));
+
+          const linktext = match[1].trim();
+          let replacement = match[0]; // Default to original text if replacement fails
+
           try {
-            const linkedNoteContent = await this.fileService.getLinkedNoteContent(link.title);
-
-            if (linkedNoteContent) {
-              // The content of the linked note is processed to remove its own frontmatter.
-              // It is then treated as plain text and injected.
-              const processedContent = removeYAMLFrontMatter(linkedNoteContent);
-
-              if (processedContent) {
-                // Replace the wikilink placeholder with the actual content.
-                updatedContent = updatedContent.replace(
-                  new RegExp(escapeRegExp(link.link), "g"),
-                  `${NEWLINE}${link.title}${NEWLINE}${processedContent}${NEWLINE}`
-                );
+            if (type === "embed") {
+              const linkedNoteContent = await this.fileService.getLinkedNoteContent(linktext);
+              if (linkedNoteContent) {
+                replacement = removeYAMLFrontMatter(linkedNoteContent) || "";
               }
-            } else {
-              console.warn(`Could not fetch linked note content for: ${link.link}`);
+            } else if (type === "wikilink") {
+              const file = this.fileService.getFirstLinkpathDest(linktext, "");
+              if (file instanceof TFile) {
+                const linkedNoteContent = await this.fileService.readFile(file);
+                const processedContent = removeYAMLFrontMatter(linkedNoteContent) || "";
+                replacement = `\n\`\`\`md ${file.name}\n${processedContent.trim()}\n\`\`\`\n`;
+              }
             }
           } catch (error) {
-            console.error(error);
+            console.error(`[ChatGPT MD] Failed to process link: ${match[0]}`, error);
           }
+
+          newContentParts.push(replacement);
+          lastIndex = match.index! + match[0].length;
         }
+
+        // Add the remaining text after the last match
+        newContentParts.push(currentContent.substring(lastIndex));
 
         // Return a new message object with the updated content.
         return {
           ...message,
-          content: updatedContent,
+          content: newContentParts.join(""),
         };
       })
     );

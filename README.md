@@ -29,7 +29,9 @@ Start chatting, don't worry too much about the more advanced features. They will
   * All chat notes are stored locally in your vault.
   * Zero tracking and no 3rd party integrations except direct calls to the OpenAI API.
 * **Link context**:
-  * Provide links to any other note in your vault for added context during conversations with Markdown or Wiki links.
+  * Provide links to other notes in your vault for added context.
+  * `![[embeds]]` are replaced by the raw content of the linked note.
+  * `[[wikilinks]]` are replaced by a Markdown code block containing the content of the linked note.
 * **Per-note Configuration:**
   * Overwrite default settings via frontmatter for individual notes using params from the [OpenAI API](https://platform.openai.com/docs/api-reference/chat).
 * **Markdown Support:**
