@@ -25,8 +25,6 @@ export interface FolderSettings {
 export interface ChatBehaviorSettings {
   /** Whether to stream responses from the AI */
   stream: boolean;
-  /** Whether to disable the plugin's system message */
-  disablePluginSystemMessage: boolean;
   /** Whether Enter key sends message, or Shift+Enter */
   enterToSend: boolean;
 }
@@ -86,7 +84,6 @@ export const DEFAULT_SETTINGS: ChatGPT_MDSettings = {
 
   // Chat Behavior
   stream: true,
-  disablePluginSystemMessage: false,
   enterToSend: true,
 
   // Formatting

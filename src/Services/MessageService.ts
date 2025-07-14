@@ -169,10 +169,8 @@ export class MessageService {
    */
   processResponse(editor: Editor, response: any, settings: ChatGPT_MDSettings): void {
     if (response.mode === "streaming") {
-      // Only add user section if streaming was not aborted
-      if (!response.wasAborted) {
-        this.processStreamingResponse(editor, settings);
-      }
+      // Only add user section if streaming was successful
+      this.processStreamingResponse(editor, settings);
     } else {
       this.processStandardResponse(editor, response, settings);
     }

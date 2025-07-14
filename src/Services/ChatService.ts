@@ -143,7 +143,7 @@ export class ChatService {
       }
 
       // 5. Append the full response to the file now that streaming is complete.
-      if (response && !response.wasAborted) {
+      if (response) {
         const assistantHeader = this.messageService.getHeaderRole(
           getHeadingPrefix(settings.headingLevel),
           ROLE_ASSISTANT,
@@ -207,7 +207,7 @@ export class ChatService {
         callbacks.onDone(response.fullString);
       }
 
-      if (response && !response.wasAborted) {
+      if (response) {
         const assistantHeader = this.messageService.getHeaderRole(
           getHeadingPrefix(settings.headingLevel),
           ROLE_ASSISTANT,
@@ -259,12 +259,6 @@ export class ChatService {
         undefined,
         callbacks
       );
-
-      if (response?.wasAborted) {
-        const e = new Error("Request aborted by user");
-        e.name = "AbortError";
-        throw e;
-      }
 
       if (response) {
         await this.updateMessage(file, assistantMessageIndex, response.fullString);

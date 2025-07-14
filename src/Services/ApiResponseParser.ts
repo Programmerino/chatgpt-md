@@ -46,14 +46,12 @@ export class ApiResponseParser {
     response: Response,
     serviceType: string,
     editor: Editor | undefined,
-    contentStartCursor: EditorPosition | undefined,
+    streamEndTracker: { current: EditorPosition | undefined },
     callbacks?: StreamCallbacks
   ): Promise<string> {
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let text = "";
-
-    let currentInsertPosition = contentStartCursor;
 
     // This loop will be broken externally by an AbortError if cancelled.
     while (true) {
@@ -67,9 +65,9 @@ export class ApiResponseParser {
         const contentChunk = this.processStreamLine(line);
         if (contentChunk) {
           text += contentChunk;
-          if (editor && currentInsertPosition) {
-            editor.replaceRange(contentChunk, currentInsertPosition);
-            currentInsertPosition = calculateEndPosition(currentInsertPosition, contentChunk);
+          if (editor && streamEndTracker.current) {
+            editor.replaceRange(contentChunk, streamEndTracker.current);
+            streamEndTracker.current = calculateEndPosition(streamEndTracker.current, contentChunk);
           }
           callbacks?.onChunk(contentChunk);
         }
@@ -81,9 +79,9 @@ export class ApiResponseParser {
       this.notificationService.showWarning("Unclosed code block detected. Appending closing fence.");
       const finalChunk = `\n${openFence}`;
       text += finalChunk;
-      if (editor && currentInsertPosition) {
-        editor.replaceRange(finalChunk, currentInsertPosition);
-        currentInsertPosition = calculateEndPosition(currentInsertPosition, finalChunk);
+      if (editor && streamEndTracker.current) {
+        editor.replaceRange(finalChunk, streamEndTracker.current);
+        streamEndTracker.current = calculateEndPosition(streamEndTracker.current, finalChunk);
       }
       callbacks?.onChunk(finalChunk);
     }

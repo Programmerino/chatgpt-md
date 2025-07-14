@@ -3,7 +3,7 @@ import { Message } from "src/Models/Message";
 import { ApiService } from "./ApiService";
 import { ApiAuthService } from "./ApiAuthService";
 import { ApiResponseParser } from "./ApiResponseParser";
-import { API_ENDPOINTS, PLUGIN_SYSTEM_MESSAGE, DEBUG_MODEL_ID } from "src/Constants";
+import { API_ENDPOINTS, DEBUG_MODEL_ID } from "src/Constants";
 import { ChatGPT_MDSettings } from "src/Models/Config";
 import { ErrorService } from "./ErrorService";
 import { NotificationService } from "./NotificationService";
@@ -26,7 +26,6 @@ export interface IAiApiService {
   ): Promise<{
     fullString: string;
     mode: string;
-    wasAborted?: boolean;
   }>;
 
   cancelRequest(): void;
@@ -42,7 +41,6 @@ export interface IAiApiService {
 export type StreamingResponse = {
   fullString: string;
   mode: "streaming";
-  wasAborted?: boolean;
 };
 
 export abstract class BaseAiService implements IAiApiService {
@@ -121,7 +119,7 @@ export abstract class BaseAiService implements IAiApiService {
     options: Record<string, unknown>,
     settings: ChatGPT_MDSettings
   ): { payload: Record<string, any>; service: string } {
-    const { payload } = this.prepareApiCall(apiKey, messages, options, false, settings);
+    const { payload } = this.prepareApiCall(apiKey, messages, options, settings);
     return { payload, service: this.serviceType };
   }
 
@@ -132,14 +130,6 @@ export abstract class BaseAiService implements IAiApiService {
   protected getApiEndpoint(config: Record<string, unknown>): string {
     const url = typeof config.url === "string" ? config.url : "";
     return `${url}${API_ENDPOINTS[this.serviceType as keyof typeof API_ENDPOINTS]}`;
-  }
-
-  protected addPluginSystemMessage(messages: Message[]): Message[] {
-    const pluginSystemMessage: Message = {
-      role: this.getSystemMessageRole(),
-      content: PLUGIN_SYSTEM_MESSAGE,
-    };
-    return [pluginSystemMessage, ...messages];
   }
 
   protected processSystemCommands(messages: Message[], systemCommands: string[] | null | undefined): Message[] {
@@ -155,16 +145,11 @@ export abstract class BaseAiService implements IAiApiService {
     apiKey: string | undefined,
     messages: Message[],
     config: Record<string, unknown>,
-    skipPluginSystemMessage: boolean = false,
     settings?: ChatGPT_MDSettings
   ) {
     this.apiAuthService.validateApiKey(apiKey, this.serviceType);
 
-    const shouldAddPluginSystemMessage = !skipPluginSystemMessage && !settings?.disablePluginSystemMessage;
-
-    const finalMessages = shouldAddPluginSystemMessage ? this.addPluginSystemMessage(messages) : messages;
-
-    const payload = this.createPayload(config, finalMessages);
+    const payload = this.createPayload(config, messages);
     const headers = this.apiAuthService.createAuthHeaders(apiKey!, this.serviceType);
 
     return { payload, headers };
@@ -192,9 +177,10 @@ export abstract class BaseAiService implements IAiApiService {
   ): Promise<StreamingResponse> {
     let headerStartCursor: EditorPosition | undefined;
     let contentStartCursor: EditorPosition | undefined;
+    const streamEndTracker = { current: contentStartCursor };
 
     try {
-      const { payload, headers } = this.prepareApiCall(apiKey, messages, config, false, settings);
+      const { payload, headers } = this.prepareApiCall(apiKey, messages, config, settings);
 
       if (editor && !callbacks) {
         const lastLine = editor.lastLine();
@@ -207,6 +193,7 @@ export abstract class BaseAiService implements IAiApiService {
         const assistantHeader = this.apiResponseParser.getAssistantHeader(headingPrefix, payload.model);
         editor.replaceSelection(assistantHeader);
         contentStartCursor = editor.getCursor();
+        streamEndTracker.current = contentStartCursor;
       }
 
       const response = await this.apiService.makeStreamingRequest(
@@ -220,27 +207,30 @@ export abstract class BaseAiService implements IAiApiService {
         response,
         this.serviceType,
         editor,
-        contentStartCursor,
+        streamEndTracker,
         callbacks
       );
 
-      return { fullString: resultText, mode: "streaming", wasAborted: false };
+      return { fullString: resultText, mode: "streaming" };
     } catch (err) {
       if (err.name === "AbortError") {
         console.log("[ChatGPT MD] Stream was aborted by user.");
-        if (editor && headerStartCursor && contentStartCursor) {
-          // Clean up the partial header that was inserted
-          const currentCursor = editor.getCursor();
-          editor.replaceRange("", headerStartCursor, currentCursor);
+        if (editor && headerStartCursor) {
+          // Clean up the partial header AND content that was inserted.
+          // The end position is now correctly tracked in streamEndTracker.
+          const endCursor = streamEndTracker.current;
+          if (endCursor) {
+            editor.replaceRange("", headerStartCursor, endCursor);
+          }
         }
         callbacks?.onDone("");
-        return { fullString: "", mode: "streaming", wasAborted: true };
+        throw err; // Re-throw to be handled by the caller
       }
       // Handle other types of errors during streaming
       const errorMessage = `Error during streaming: ${err.message || err}`;
       console.error(`[ChatGPT MD]`, errorMessage);
       callbacks?.onDone("");
-      return { fullString: errorMessage, mode: "streaming" };
+      throw new Error(errorMessage);
     }
   }
 
@@ -254,7 +244,7 @@ export abstract class BaseAiService implements IAiApiService {
       console.log(`[ChatGPT MD] "no stream"`, config);
 
       config.stream = false;
-      const { payload, headers } = this.prepareApiCall(apiKey, messages, config, false, settings);
+      const { payload, headers } = this.prepareApiCall(apiKey, messages, config, settings);
 
       const response = await this.apiService.makeNonStreamingRequest(
         this.getApiEndpoint(config),

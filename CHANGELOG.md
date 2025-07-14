@@ -10,6 +10,7 @@
   - `Create new chat with highlighted text` command
   - "Generate at cursor" setting (all responses now append to the end of the note)
   - `Select Model` command (model can still be changed in frontmatter or sidebar)
+- **Removed Plugin System Message**: The automatic, non-configurable system message sent with every request has been removed to provide a cleaner, more direct interaction with the API.
 - **Codebase Health**: Refactored internal services to align with Obsidian API best practices, improving file handling safety and reducing complexity.
 - **API Handling**: Removed special filtering for AI models and citations to provide a more direct and unopinionated API experience.
 
