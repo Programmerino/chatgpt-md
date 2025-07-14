@@ -116,7 +116,6 @@ export interface OpenAIConfig {
   model: string;
   presence_penalty?: number;
   stream?: boolean;
-  system_commands?: string[] | null;
   tags?: string[] | null;
   temperature?: number;
   title?: string;

@@ -16,6 +16,7 @@ import { Message } from "../Models/Message";
 import { ChatService } from "src/Services/ChatService";
 import { CommandRegistry } from "src/core/CommandRegistry";
 import { DEFAULT_OPENAI_CONFIG } from "src/Services/OpenAiService";
+import { extractRoleAndMessage } from "src/Utilities/TextHelpers";
 
 export const CHAT_SIDE_VIEW_TYPE = "chat-side-view";
 
@@ -38,7 +39,7 @@ export class ChatSideView extends ItemView {
   private currentAssistantMessageContent = "";
   private currentChatFile: TFile | null = null;
   private isAwaitingResponse = false;
-  private currentMessagesCache: string = "[]";
+  private currentFileContentCache: string = "";
 
   constructor(leaf: WorkspaceLeaf, serviceLocator: ServiceLocator) {
     super(leaf);
@@ -66,7 +67,7 @@ export class ChatSideView extends ItemView {
     this.currentChatFile = newFile;
 
     if (fileChanged) {
-      this.currentMessagesCache = "[]";
+      this.currentFileContentCache = "";
     }
 
     if (this.currentChatFile) {
@@ -275,7 +276,7 @@ export class ChatSideView extends ItemView {
   }
 
   async renderConversation() {
-    if (this.isRendering && !this.isAwaitingResponse) return;
+    if (this.isRendering || this.isAwaitingResponse) return;
     this.isRendering = true;
 
     try {
@@ -289,19 +290,16 @@ export class ChatSideView extends ItemView {
         fileContent = await this.app.vault.read(this.currentChatFile);
       }
 
-      const editorService = this.serviceLocator.getEditorService();
-      const settings = this.serviceLocator.getSettingsService().getSettings();
-      const { messagesWithRole } = await editorService.getMessagesFromFileContent(fileContent, settings);
-
-      const newMessagesCache = JSON.stringify(messagesWithRole);
-
-      if (newMessagesCache === this.currentMessagesCache) {
+      if (fileContent === this.currentFileContentCache) {
         this.isRendering = false;
         return;
       }
 
-      this.currentMessagesCache = newMessagesCache;
+      this.currentFileContentCache = fileContent;
       this.messageContainer.empty();
+
+      const { messageBlocks } = await this.chatService.getFileContentParts(this.currentChatFile, fileContent);
+      const messagesWithRole = messageBlocks.map((block) => extractRoleAndMessage(block));
 
       const isLastMessageUser =
         messagesWithRole.length > 0 && messagesWithRole[messagesWithRole.length - 1].role === "user";
@@ -624,7 +622,7 @@ export class ChatSideView extends ItemView {
       this.setButtonState("idle");
       this.textInput.focus();
       // Force a full re-render from file to ensure UI is in sync.
-      this.currentMessagesCache = "";
+      this.currentFileContentCache = "";
       await this.updateView();
     }
   }

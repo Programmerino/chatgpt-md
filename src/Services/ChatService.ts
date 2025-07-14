@@ -279,13 +279,16 @@ export class ChatService {
     await this.serviceLocator.getApp().vault.process(file, () => newContent);
   }
 
-  public async getFileContentParts(file: TFile): Promise<{ frontmatter: string; messageBlocks: string[] }> {
-    const fileContent = await this.serviceLocator.getApp().vault.read(file);
+  public async getFileContentParts(
+    file: TFile,
+    fileContent?: string
+  ): Promise<{ frontmatter: string; messageBlocks: string[] }> {
+    const contentToParse = fileContent ?? (await this.serviceLocator.getApp().vault.read(file));
     const fileCache = this.serviceLocator.getApp().metadataCache.getFileCache(file);
     const frontmatterEndOffset = fileCache?.frontmatterPosition?.end.offset ?? 0;
 
-    const frontmatter = fileContent.substring(0, frontmatterEndOffset);
-    const content = fileContent.substring(frontmatterEndOffset).trim();
+    const frontmatter = contentToParse.substring(0, frontmatterEndOffset);
+    const content = contentToParse.substring(frontmatterEndOffset).trim();
 
     const messageBlocks = splitMessages(content);
 

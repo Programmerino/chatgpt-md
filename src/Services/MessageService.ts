@@ -36,26 +36,12 @@ export class MessageService {
   }
 
   /**
-   * Get messages from the editor
-   */
-  async getMessagesFromEditor(
-    editor: Editor,
-    settings: ChatGPT_MDSettings
-  ): Promise<{
-    messages: string[];
-    messagesWithRole: Message[];
-  }> {
-    return this.getMessages(editor.getValue(), settings);
-  }
-
-  /**
    * Get messages from a string content, processing and inlining wikilinks and embeds.
    */
   async getMessages(
     content: string,
     settings: ChatGPT_MDSettings
   ): Promise<{
-    messages: string[];
     messagesWithRole: Message[];
   }> {
     // 1. Get raw message strings from the content, split by horizontal rules.
@@ -69,20 +55,13 @@ export class MessageService {
       messagesWithRole.map(async (message) => {
         const currentContent = message.content;
 
-        const embedRegex = /\!\[\[([^|\]\n]+)(?:\|.*)?\]\]/g;
-        const wikilinkRegex = /(?<!\!)\[\[([^|\]\n]+)(?:\|.*)?\]\]/g;
+        // Use a single regex to find both embeds and wikilinks, avoiding negative lookbehind for mobile compatibility.
+        const linkRegex = /(\!?)\[\[([^|\]\n]+)(?:\|.*)?\]\]/g;
 
-        // Find all matches and tag them with their type.
-        const embedMatches: LinkMatch[] = Array.from(currentContent.matchAll(embedRegex)).map((m) => ({
+        const allMatches: LinkMatch[] = Array.from(currentContent.matchAll(linkRegex)).map((m) => ({
           match: m,
-          type: "embed",
+          type: m[1] === "!" ? "embed" : "wikilink", // Check if it's an embed or wikilink
         }));
-        const wikilinkMatches: LinkMatch[] = Array.from(currentContent.matchAll(wikilinkRegex)).map((m) => ({
-          match: m,
-          type: "wikilink",
-        }));
-
-        const allMatches = [...embedMatches, ...wikilinkMatches].sort((a, b) => a.match.index! - b.match.index!);
 
         if (allMatches.length === 0) {
           return message;
@@ -96,7 +75,7 @@ export class MessageService {
           // Add text before the match
           newContentParts.push(currentContent.substring(lastIndex, match.index));
 
-          const linktext = match[1].trim();
+          const linktext = match[2].trim();
           let replacement = match[0]; // Default to original text if replacement fails
 
           try {
@@ -132,27 +111,7 @@ export class MessageService {
       })
     );
 
-    // Reconstruct the `messages` string array for backward compatibility.
-    const messages = messagesWithRole.map((m) => m.content);
-
-    return { messages, messagesWithRole };
-  }
-
-  /**
-   * Add system commands to messages
-   */
-  addSystemCommandsToMessages(messagesWithRole: Message[], systemCommands: string[] | null): Message[] {
-    if (!systemCommands || systemCommands.length === 0) {
-      return messagesWithRole;
-    }
-
-    // Add system commands to the beginning of the list
-    const systemMessages = systemCommands.map((command) => ({
-      role: "system",
-      content: command,
-    }));
-
-    return [...systemMessages, ...messagesWithRole];
+    return { messagesWithRole };
   }
 
   /**

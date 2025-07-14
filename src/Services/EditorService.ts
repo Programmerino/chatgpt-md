@@ -46,17 +46,15 @@ export class EditorService {
     editor: Editor,
     settings: ChatGPT_MDSettings
   ): Promise<{
-    messages: string[];
     messagesWithRole: Message[];
   }> {
-    return this.messageService.getMessagesFromEditor(editor, settings);
+    return this.messageService.getMessages(editor.getValue(), settings);
   }
 
   async getMessagesFromFileContent(
     content: string,
     settings: ChatGPT_MDSettings
   ): Promise<{
-    messages: string[];
     messagesWithRole: Message[];
   }> {
     return this.messageService.getMessages(content, settings);
