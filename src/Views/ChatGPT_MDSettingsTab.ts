@@ -50,7 +50,8 @@ export class ChatGPT_MDSettingsTab extends PluginSettingTab {
       {
         id: "defaultChatFrontmatter",
         name: "Default chat frontmatter",
-        description: "Default frontmatter for new chat files. You can use all parameters from the OpenAI API here.",
+        description:
+          "Default frontmatter for new chat files. This is prepended to chat templates that do not contain their own frontmatter.",
         type: "textarea",
         placeholder: DEFAULT_CHAT_FRONT_MATTER,
         group: "Chat Behavior",

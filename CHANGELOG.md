@@ -1,6 +1,22 @@
 # ChatGPT MD Changelog
 
-## v2.6.0 (Upcoming) - Simplification & Core Focus
+## v2.7.0 (Upcoming) - System Prompt as a Message & Usability Enhancements
+
+### Major Refactoring & Breaking Change
+- **System Prompt as a Message Type**: The `system_commands` frontmatter key has been removed. System prompts are now a first-class message type within the chat, defined using `### role::system`.
+  - **Why?**: This provides a more intuitive and flexible way to manage AI instructions. You can now view the system prompt directly in the chat history, edit it like any other message, and even change it mid-conversation.
+  - **Migration**: Chats using the old `system_commands` key will need to be manually updated to use the new `role::system` format.
+
+### Feature Enhancements & Bug Fixes
+- **System Messages in Chat View**: System messages are now displayed in the Chat Sidebar with a distinct style, making the entire conversation flow visible.
+- **Improved Message Separator**: The plugin is now more robust in parsing messages separated by horizontal rules (`---` or `***`). Manually editing chat files is now more reliable.
+- **Enhanced Import**: The "Import from AI Studio" feature has been updated to correctly import system instructions as `role::system` messages.
+
+### Code Maintenance
+- **Refactored Chat Service**: The internal `ChatService` has been streamlined to reduce code duplication and improve maintainability.
+- **Unified Text Helpers**: Centralized logic for parsing message content, ensuring consistent behavior throughout the plugin.
+
+## v2.6.0 - Simplification & Core Focus
 
 ### Major Refactoring
 - **Feature Simplification**: To improve stability and focus on the core chat experience, the following features have been removed:

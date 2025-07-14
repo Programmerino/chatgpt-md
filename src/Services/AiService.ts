@@ -132,15 +132,6 @@ export abstract class BaseAiService implements IAiApiService {
     return `${url}${API_ENDPOINTS[this.serviceType as keyof typeof API_ENDPOINTS]}`;
   }
 
-  protected processSystemCommands(messages: Message[], systemCommands: string[] | null | undefined): Message[] {
-    if (!systemCommands || systemCommands.length === 0) return messages;
-    const systemMessages = systemCommands.map((command) => ({
-      role: this.getSystemMessageRole(),
-      content: command,
-    }));
-    return [...systemMessages, ...messages];
-  }
-
   protected prepareApiCall(
     apiKey: string | undefined,
     messages: Message[],

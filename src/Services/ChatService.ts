@@ -1,7 +1,7 @@
 import { Editor, MarkdownView, Notice, Platform, TFile } from "obsidian";
 import { ServiceLocator } from "../core/ServiceLocator";
 import { SettingsService } from "./SettingsService";
-import { getHeadingPrefix } from "../Utilities/TextHelpers";
+import { getHeadingPrefix, splitMessages } from "../Utilities/TextHelpers";
 import { HORIZONTAL_LINE_MD, ROLE_ASSISTANT, ROLE_USER } from "src/Constants";
 import { ApiAuthService } from "./ApiAuthService";
 import { MessageService } from "./MessageService";
@@ -287,9 +287,9 @@ export class ChatService {
     const frontmatter = fileContent.substring(0, frontmatterEndOffset);
     const content = fileContent.substring(frontmatterEndOffset).trim();
 
-    const messageBlocks = content ? content.split(new RegExp(`\\n*${HORIZONTAL_LINE_MD}\\n*`)) : [];
+    const messageBlocks = splitMessages(content);
 
-    return { frontmatter, messageBlocks: messageBlocks.filter(Boolean) };
+    return { frontmatter, messageBlocks };
   }
 
   public async updateMessage(file: TFile, messageIndex: number, newContent: string): Promise<void> {

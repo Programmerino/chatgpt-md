@@ -4,7 +4,7 @@ import { FileService } from "src/Services/FileService";
 import { MessageService } from "src/Services/MessageService";
 import { Message } from "src/Models/Message";
 import { getHeadingPrefix } from "src/Utilities/TextHelpers";
-import { HORIZONTAL_LINE_MD, NEWLINE, ROLE_ASSISTANT, ROLE_IDENTIFIER, ROLE_USER } from "src/Constants";
+import { HORIZONTAL_LINE_MD, NEWLINE, ROLE_ASSISTANT, ROLE_IDENTIFIER, ROLE_SYSTEM, ROLE_USER } from "src/Constants";
 
 interface AiStudioChunk {
   text: string;
@@ -96,18 +96,24 @@ export class ImportConversationModal extends Modal {
           frontmatter.max_tokens = data.runSettings.maxOutputTokens;
         }
       }
-      if (data.systemInstruction?.text) {
-        frontmatter.system_commands = [data.systemInstruction.text];
-      }
       frontmatter.stream = true; // Default to stream enabled
 
       // --- 2. Parse Messages ---
-      const messages: Message[] = (data.chunkedPrompt?.chunks ?? [])
+      const messages: Message[] = [];
+      if (data.systemInstruction?.text) {
+        messages.push({
+          role: ROLE_SYSTEM,
+          content: data.systemInstruction.text.trim(),
+        });
+      }
+
+      const conversationChunks = (data.chunkedPrompt?.chunks ?? [])
         .filter((chunk) => !chunk.isThought && chunk.text.trim() !== "")
         .map((chunk) => ({
           role: chunk.role === "model" ? ROLE_ASSISTANT : ROLE_USER,
-          content: chunk.text,
+          content: chunk.text.trim(),
         }));
+      messages.push(...conversationChunks);
 
       if (messages.length === 0) {
         new Notice("No valid messages found in the JSON data.");
@@ -125,7 +131,7 @@ export class ImportConversationModal extends Modal {
             ? `<span style="font-size: small;"> (${frontmatter.model as string})</span>`
             : "";
         const header = `${headingPrefix}${ROLE_IDENTIFIER}${msg.role}${modelSpan}${NEWLINE}`;
-        return `${header}${msg.content.trim()}`;
+        return `${header}${msg.content}`;
       });
 
       markdownContent += messageBlocks.join(`\n\n${HORIZONTAL_LINE_MD}\n\n`);

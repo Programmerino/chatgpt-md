@@ -6,6 +6,7 @@ import {
   ROLE_ASSISTANT,
   ROLE_DEVELOPER,
   ROLE_IDENTIFIER,
+  ROLE_SYSTEM,
   ROLE_USER,
 } from "src/Constants";
 
@@ -30,7 +31,7 @@ export const unfinishedCodeBlock = (text: string): string | null => {
 const cleanupRole = (role: string): string => {
   const trimmedRole = role.trim().toLowerCase();
 
-  const roles = [ROLE_USER, ROLE_ASSISTANT, ROLE_DEVELOPER];
+  const roles = [ROLE_USER, ROLE_ASSISTANT, ROLE_DEVELOPER, ROLE_SYSTEM];
 
   const foundRole = roles.find((r) => trimmedRole.includes(r));
 
@@ -108,8 +109,9 @@ export const escapeRegExp = (string: string): string => {
 
 export const splitMessages = (text: string | undefined): string[] => {
   if (!text) return [];
-  // Split by the horizontal rule and filter out any empty or whitespace-only strings.
-  return text.split(HORIZONTAL_LINE_MD).filter((s) => s.trim().length > 0);
+  // Split by markdown horizontal rule. This regex handles ---, ***, or ___ on a line by itself,
+  // with optional surrounding whitespace. The /m flag is for multiline matching.
+  return text.split(/^\s*(?:-|\*|_){3,}\s*$/m).filter((s) => s.trim().length > 0);
 };
 
 export const removeYAMLFrontMatter = (note: string | undefined): string | undefined => {

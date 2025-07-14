@@ -263,18 +263,6 @@ export class ChatSideView extends ItemView {
     });
 
     new Setting(this.paramsEl)
-      .setName("System Prompt")
-      .setDesc("The instructions for the AI assistant.")
-      .addTextArea((text) => {
-        text.setValue(Array.isArray(frontmatter.system_commands) ? frontmatter.system_commands.join("\n") : "");
-        text.inputEl.rows = 5;
-        text.onChange((value) => {
-          const commands = value.split("\n").filter((cmd) => cmd.trim() !== "");
-          debouncedUpdate("system_commands", commands);
-        });
-      });
-
-    new Setting(this.paramsEl)
       .setName("Temperature")
       .setDesc("Controls randomness. Lower is more deterministic.")
       .addSlider((slider) => {

@@ -12,7 +12,6 @@ export const DEFAULT_OPENAI_CONFIG: OpenAIConfig = {
   aiService: AI_SERVICE_OPENAI,
   model: "gpt-4o-mini",
   stream: true,
-  system_commands: null,
   tags: [],
   title: "Untitled",
   url: "https://api.openai.com",
@@ -61,12 +60,10 @@ export class OpenAiService extends BaseAiService implements IAiApiService {
 
   createPayload(config: Record<string, unknown>, messages: Message[]): OpenAIStreamPayload {
     const modelName = config.model as string;
-    const systemCommands = Array.isArray(config.system_commands) ? (config.system_commands as string[]) : null;
-    const processedMessages = this.processSystemCommands(messages, systemCommands);
 
     const payload: OpenAIStreamPayload = {
       model: modelName,
-      messages: processedMessages,
+      messages: messages,
       stream: !!config.stream,
     };
 

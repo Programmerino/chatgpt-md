@@ -45,8 +45,6 @@ export interface FormattingSettings {
 export interface TemplateSettings {
   /** Default frontmatter for new chat files */
   defaultChatFrontmatter: string;
-  /** System commands to include in the chat */
-  system_commands?: string[] | null;
 }
 
 /**

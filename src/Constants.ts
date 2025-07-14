@@ -34,8 +34,7 @@ export const DEFAULT_DATE_FORMAT = "YYYYMMDDhhmmss";
 
 export const ERROR_NO_CONNECTION = "Failed to fetch";
 
-export const HORIZONTAL_LINE_CLASS = "__chatgpt_plugin";
-export const HORIZONTAL_LINE_MD = `<hr class="${HORIZONTAL_LINE_CLASS}">`;
+export const HORIZONTAL_LINE_MD = `---`;
 
 export const ROLE_IDENTIFIER = "role::";
 export const ROLE_ASSISTANT = "assistant";
@@ -44,7 +43,6 @@ export const ROLE_SYSTEM = "system";
 export const ROLE_USER = "user";
 
 export const DEFAULT_CHAT_FRONT_MATTER = `---
-system_commands: ['I am a helpful assistant.']
 model: gpt-4o-mini
 stream: true
 ---`;
